@@ -6,13 +6,32 @@ function App() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [formData, setFormData] = useState({ email: '', password: '', username: '' })
+  const [error, setError] = useState('')
 
   const handleAuth = () => {
-    if (formData.email && formData.password) {
-      setIsLoggedIn(true)
-      setShowAuthModal(false)
-      setFormData({ email: '', password: '', username: '' })
+    setError('')
+    if (!formData.email || !formData.password) {
+      setError('Please fill in all required fields')
+      return
     }
+    if (authMode === 'register' && !formData.username) {
+      setError('Please enter your name')
+      return
+    }
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address')
+      return
+    }
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+
+    setIsLoggedIn(true)
+    setShowAuthModal(false)
+    setFormData({ email: '', password: '', username: '' })
   }
 
   return (
@@ -21,7 +40,7 @@ function App() {
       <nav className="fixed top-0 w-full bg-white shadow-md z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <span className="text-4xl">🍎</span>
+            <span className="text-4xl">🌍</span>
             <h1 className="text-3xl font-bold text-red-600">Pomi</h1>
           </div>
           <div className="flex items-center gap-6">
@@ -58,18 +77,21 @@ function App() {
       {/* Hero Section */}
       <header className="pt-32 pb-20 px-6 bg-gradient-to-r from-red-50 to-orange-50">
         <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-6xl font-bold text-gray-900 mb-6">
-            Where Your Ethiopian Community <span className="text-red-600">Blooms</span>
+          <h2 className="text-6xl font-bold text-gray-900 mb-4">
+            Welcome to Pomi
           </h2>
+          <p className="text-2xl text-red-600 font-semibold mb-6">
+            The Hub for Habesha Community in Ottawa
+          </p>
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            Pomi is your complete hub for connecting with Ottawa's Ethiopian community. Discover events, support local businesses, find mentorship, and celebrate our shared heritage.
+            Connect with fellow Habeshas, celebrate our rich culture, and build meaningful relationships. Whether you speak Amharic, Tigrinya, or Oromo, Pomi is your digital home for community, culture, and commerce.
           </p>
           {!isLoggedIn && (
             <button
               onClick={() => { setAuthMode('register'); setShowAuthModal(true) }}
               className="bg-red-600 hover:bg-red-700 text-white px-10 py-4 rounded-lg font-bold text-xl transition shadow-lg"
             >
-              Get Started Free
+              Join Our Community
             </button>
           )}
         </div>
@@ -84,20 +106,20 @@ function App() {
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
               <p className="text-lg text-gray-600 mb-4">
-                Pomi (pomegranate) is more than just a platform—it's a seed of community. Like the pomegranate's many seeds, Pomi brings together many facets of Ethiopian community life in Ottawa.
+                Pomi is the digital gathering place for the Habesha community in Ottawa—a space where traditions meet technology and connections flourish.
               </p>
               <p className="text-lg text-gray-600 mb-4">
-                Whether you're looking to connect with others, discover events, explore business opportunities, or find mentorship, Pomi is your one-stop destination for Ethiopian community engagement.
+                Whether you're here to celebrate Ethiopian, Eritrean, or other East African heritage, find business opportunities, discover cultural events, or simply connect with people who share your values and background—Pomi brings it all together.
               </p>
               <p className="text-lg text-gray-600">
-                Our mission is simple: connect, grow, and thrive together.
+                We believe in the strength of community. Here, language, culture, and shared experiences connect us all.
               </p>
             </div>
             <div className="text-center">
-              <div className="text-8xl mb-6">🍎</div>
+              <div className="text-8xl mb-6">🌍</div>
               <div className="bg-red-100 rounded-lg p-8">
                 <p className="text-xl font-bold text-red-600">
-                  Seed of Community, Fruit of Success
+                  "Where Culture Meets Connection"
                 </p>
               </div>
             </div>
@@ -252,44 +274,64 @@ function App() {
 
       {/* Auth Modal */}
       {showAuthModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-10 w-full max-w-md shadow-2xl">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-3xl font-bold text-gray-900">
-                {authMode === 'login' ? 'Welcome Back' : 'Join Pomi'}
-              </h3>
+              <div>
+                <h3 className="text-3xl font-bold text-gray-900">
+                  {authMode === 'login' ? 'Welcome Back' : 'Join Our Community'}
+                </h3>
+                <p className="text-gray-600 text-sm mt-1">
+                  {authMode === 'login' ? 'Sign in to your account' : 'Create a new account to get started'}
+                </p>
+              </div>
               <button
-                onClick={() => setShowAuthModal(false)}
+                onClick={() => { setShowAuthModal(false); setError('') }}
                 className="text-gray-500 hover:text-gray-700 text-3xl font-light"
               >
                 ×
               </button>
             </div>
 
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
+                {error}
+              </div>
+            )}
+
             <div className="space-y-4 mb-6">
               {authMode === 'register' && (
-                <input
-                  type="text"
-                  placeholder="Full Name"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  className="w-full bg-gray-50 text-gray-900 px-5 py-3 rounded-lg border border-gray-300 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-lg"
-                />
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    className="w-full bg-gray-50 text-gray-900 px-5 py-3 rounded-lg border border-gray-300 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-base"
+                  />
+                </div>
               )}
-              <input
-                type="email"
-                placeholder="Email Address"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full bg-gray-50 text-gray-900 px-5 py-3 rounded-lg border border-gray-300 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-lg"
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="w-full bg-gray-50 text-gray-900 px-5 py-3 rounded-lg border border-gray-300 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-lg"
-              />
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">Email Address</label>
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full bg-gray-50 text-gray-900 px-5 py-3 rounded-lg border border-gray-300 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-base"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">Password</label>
+                <input
+                  type="password"
+                  placeholder={authMode === 'register' ? 'At least 6 characters' : 'Enter your password'}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full bg-gray-50 text-gray-900 px-5 py-3 rounded-lg border border-gray-300 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-base"
+                />
+              </div>
             </div>
 
             <button
@@ -299,11 +341,11 @@ function App() {
               {authMode === 'login' ? 'Sign In' : 'Create Account'}
             </button>
 
-            <div className="text-center">
-              <p className="text-gray-600">
+            <div className="text-center border-t pt-4">
+              <p className="text-gray-600 text-sm">
                 {authMode === 'login' ? "Don't have an account? " : 'Already have an account? '}
                 <button
-                  onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                  onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setError('') }}
                   className="text-red-600 hover:text-red-700 font-bold"
                 >
                   {authMode === 'login' ? 'Sign Up' : 'Sign In'}
