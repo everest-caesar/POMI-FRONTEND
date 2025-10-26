@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
+import authService from './services/authService'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -7,30 +8,87 @@ function App() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [formData, setFormData] = useState({ email: '', password: '', username: '' })
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [userName, setUserName] = useState('')
 
-  const handleAuth = () => {
+  // Check if user is already logged in on mount
+  useEffect(() => {
+    if (authService.isAuthenticated()) {
+      setIsLoggedIn(true)
+      // Optionally fetch user data
+      authService.getCurrentUser()
+        .then((response) => {
+          setUserName(response.user.username)
+        })
+        .catch((error) => {
+          console.error('Failed to fetch user:', error)
+          // Token might be invalid, logout
+          handleLogout()
+        })
+    }
+  }, [])
+
+  const handleAuth = async () => {
     setError('')
-    if (!formData.email || !formData.password) {
-      setError('Please fill in all required fields')
-      return
-    }
-    if (authMode === 'register' && !formData.username) {
-      setError('Please enter your name')
-      return
-    }
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(formData.email)) {
-      setError('Please enter a valid email address')
-      return
-    }
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters')
-      return
-    }
+    setLoading(true)
 
-    setIsLoggedIn(true)
-    setShowAuthModal(false)
+    try {
+      // Validation
+      if (!formData.email || !formData.password) {
+        setError('Please fill in all required fields')
+        setLoading(false)
+        return
+      }
+      if (authMode === 'register' && !formData.username) {
+        setError('Please enter your name')
+        setLoading(false)
+        return
+      }
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(formData.email)) {
+        setError('Please enter a valid email address')
+        setLoading(false)
+        return
+      }
+      if (formData.password.length < 6) {
+        setError('Password must be at least 6 characters')
+        setLoading(false)
+        return
+      }
+
+      // Call backend API
+      let response
+      if (authMode === 'register') {
+        response = await authService.register({
+          email: formData.email,
+          password: formData.password,
+          username: formData.username,
+        })
+      } else {
+        response = await authService.login({
+          email: formData.email,
+          password: formData.password,
+        })
+      }
+
+      // Store token and update state
+      authService.setToken(response.token)
+      setUserName(response.user.username)
+      setIsLoggedIn(true)
+      setShowAuthModal(false)
+      setFormData({ email: '', password: '', username: '' })
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogout = () => {
+    authService.removeToken()
+    setIsLoggedIn(false)
+    setUserName('')
     setFormData({ email: '', password: '', username: '' })
   }
 
@@ -46,9 +104,9 @@ function App() {
           <div className="flex items-center gap-6">
             {isLoggedIn ? (
               <>
-                <span className="text-gray-700 font-semibold">Welcome back!</span>
+                <span className="text-gray-700 font-semibold">Welcome, {userName}! 👋</span>
                 <button
-                  onClick={() => { setIsLoggedIn(false); setFormData({ email: '', password: '', username: '' }) }}
+                  onClick={handleLogout}
                   className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-bold text-lg transition"
                 >
                   Logout
@@ -336,9 +394,10 @@ function App() {
 
             <button
               onClick={handleAuth}
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-lg transition text-lg shadow-md mb-4"
+              disabled={loading}
+              className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-4 rounded-lg transition text-lg shadow-md mb-4"
             >
-              {authMode === 'login' ? 'Sign In' : 'Create Account'}
+              {loading ? 'Loading...' : (authMode === 'login' ? 'Sign In' : 'Create Account')}
             </button>
 
             <div className="text-center border-t pt-4">
@@ -346,7 +405,8 @@ function App() {
                 {authMode === 'login' ? "Don't have an account? " : 'Already have an account? '}
                 <button
                   onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setError('') }}
-                  className="text-red-600 hover:text-red-700 font-bold"
+                  disabled={loading}
+                  className="text-red-600 hover:text-red-700 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {authMode === 'login' ? 'Sign Up' : 'Sign In'}
                 </button>
