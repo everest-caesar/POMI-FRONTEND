@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 
-const API_BASE_URL = (import.meta.env as any).VITE_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = (import.meta.env as any).VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
 
 interface LoginRequest {
   email: string;
