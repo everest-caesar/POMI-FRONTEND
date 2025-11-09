@@ -19,4 +19,395 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Default styles */
+/* ==================== MAIN APP CONTAINER ==================== */
+
+.min-h-screen {
+  animation: fadeIn 0.8s ease-out;
+}
+
+/* ==================== NAVIGATION BAR ==================== */
+
+nav {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+nav:hover {
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* ==================== BUTTONS ==================== */
+
+button {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s ease-out, height 0.6s ease-out;
+  z-index: 0;
+}
+
+button:active::before {
+  width: 400px;
+  height: 400px;
+}
+
+button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+button:active {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Primary Button */
+button.bg-pomi-red-600,
+button.bg-red-600 {
+  background: linear-gradient(135deg, #C41E3A 0%, #a01730 100%);
+  box-shadow: 0 4px 15px rgba(196, 30, 58, 0.3);
+  color: white;
+  position: relative;
+  z-index: 1;
+}
+
+button.bg-pomi-red-600:hover,
+button.bg-red-600:hover {
+  box-shadow: 0 12px 28px rgba(196, 30, 58, 0.4);
+  background: linear-gradient(135deg, #E85057 0%, #C41E3A 100%);
+}
+
+button.bg-pomi-red-600 > *,
+button.bg-red-600 > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Secondary Button */
+button.bg-gray-600 {
+  background: linear-gradient(135deg, #4B5563 0%, #2C3E50 100%);
+  box-shadow: 0 4px 15px rgba(44, 62, 80, 0.3);
+  color: white;
+}
+
+button.bg-gray-600:hover {
+  box-shadow: 0 12px 28px rgba(44, 62, 80, 0.4);
+  background: linear-gradient(135deg, #5a6673 0%, #3a4c5f 100%);
+}
+
+/* Tertiary Button */
+button.border.border-red-600 {
+  background: transparent;
+  color: #C41E3A;
+  border: 2px solid #C41E3A;
+  transition: all 0.3s ease;
+}
+
+button.border.border-red-600:hover {
+  background: rgba(196, 30, 58, 0.05);
+  box-shadow: 0 4px 12px rgba(196, 30, 58, 0.1);
+}
+
+/* Ghost Button */
+button.border.border-gray-300 {
+  background: transparent;
+  color: #475569;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+button.border.border-gray-300:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* ==================== MODAL/DIALOG ==================== */
+
+.fixed.inset-0.bg-black {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.fixed.inset-0.bg-black ~ div {
+  animation: slideInUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.bg-white.rounded-lg {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* ==================== INPUT FIELDS ==================== */
+
+input, select, textarea {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1.5px solid #E5E7EB;
+  border-radius: 0.625rem;
+  background-color: #F8FAFC;
+  font-size: 1rem;
+  padding: 0.75rem 1rem;
+}
+
+input:hover, select:hover, textarea:hover {
+  border-color: #CBD5E1;
+  background-color: #f8fafc;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #C41E3A;
+  box-shadow: 0 0 0 4px rgba(196, 30, 58, 0.12), inset 0 0 0 1px rgba(196, 30, 58, 0.1);
+  outline: none;
+  background-color: #ffffff;
+}
+
+input::placeholder {
+  color: #94A3B8;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+input:focus::placeholder {
+  color: #64748B;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 120px;
+  font-family: inherit;
+}
+
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/csvg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+/* ==================== CARDS & GRIDS ==================== */
+
+.rounded-lg,
+.rounded-md,
+.rounded-2xl {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bg-white.rounded-lg,
+.bg-white.rounded-2xl {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(4px);
+}
+
+.bg-white.rounded-lg:hover,
+.bg-white.rounded-2xl:hover {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Marketplace Cards Enhancements */
+.bg-white.border.border-gray-200.rounded-lg {
+  overflow: hidden;
+  position: relative;
+}
+
+.bg-white.border.border-gray-200.rounded-lg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(196, 30, 58, 0.2), transparent);
+  z-index: 1;
+}
+
+/* Feature Card Enhancements */
+.bg-red-50.rounded-lg,
+.bg-orange-50.rounded-lg,
+.bg-yellow-50.rounded-lg,
+.bg-green-50.rounded-lg,
+.bg-blue-50.rounded-lg,
+.bg-purple-50.rounded-lg,
+.bg-pink-50.rounded-lg,
+.bg-indigo-50.rounded-lg {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.bg-red-50.rounded-lg::before,
+.bg-orange-50.rounded-lg::before,
+.bg-yellow-50.rounded-lg::before,
+.bg-green-50.rounded-lg::before,
+.bg-blue-50.rounded-lg::before,
+.bg-purple-50.rounded-lg::before,
+.bg-pink-50.rounded-lg::before,
+.bg-indigo-50.rounded-lg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.bg-red-50.rounded-lg:hover,
+.bg-orange-50.rounded-lg:hover,
+.bg-yellow-50.rounded-lg:hover,
+.bg-green-50.rounded-lg:hover,
+.bg-blue-50.rounded-lg:hover,
+.bg-purple-50.rounded-lg:hover,
+.bg-pink-50.rounded-lg:hover,
+.bg-indigo-50.rounded-lg:hover {
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+}
+
+/* ==================== TEXT & TYPOGRAPHY ==================== */
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  transition: color 0.3s ease;
+}
+
+p {
+  color: #6B7280;
+  line-height: 1.6;
+}
+
+/* ==================== BADGE/TAG STYLES ==================== */
+
+.px-3.py-1.rounded-full {
+  background: linear-gradient(135deg, rgba(196, 30, 58, 0.12) 0%, rgba(212, 175, 55, 0.08) 100%);
+  border: 1px solid rgba(196, 30, 58, 0.25);
+  animation: slideInLeft 0.4s ease-out;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.px-3.py-1.rounded-full:hover {
+  background: linear-gradient(135deg, rgba(196, 30, 58, 0.15) 0%, rgba(212, 175, 55, 0.1) 100%);
+  transform: scale(1.05);
+}
+
+/* Status Badge Styles */
+.inline-block.px-4.py-2.rounded-full {
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+  border: none;
+}
+
+.bg-green-100.text-green-700,
+.bg-blue-100.text-blue-700,
+.bg-yellow-100.text-yellow-700,
+.bg-orange-100.text-orange-700 {
+  background: linear-gradient(135deg, rgba(39, 174, 96, 0.1) 0%, rgba(39, 174, 96, 0.05) 100%);
+}
+
+.bg-green-100.text-green-700:hover {
+  background: linear-gradient(135deg, rgba(39, 174, 96, 0.15) 0%, rgba(39, 174, 96, 0.1) 100%);
+  transform: scale(1.02);
+}
+
+/* ==================== FEATURE BUTTONS ==================== */
+
+.flex.justify-center.gap-4 button {
+  animation: slideInUp 0.5s ease-out;
+  animation-fill-mode: both;
+}
+
+.flex.justify-center.gap-4 button:nth-child(1) { animation-delay: 0.1s; }
+.flex.justify-center.gap-4 button:nth-child(2) { animation-delay: 0.2s; }
+.flex.justify-center.gap-4 button:nth-child(3) { animation-delay: 0.3s; }
+.flex.justify-center.gap-4 button:nth-child(4) { animation-delay: 0.4s; }
+.flex.justify-center.gap-4 button:nth-child(5) { animation-delay: 0.5s; }
+
+/* ==================== ERROR & SUCCESS MESSAGES ==================== */
+
+.bg-red-50.border.border-red-200,
+.bg-green-50.border.border-green-200 {
+  border-left: 4px solid;
+  animation: slideInDown 0.3s ease-out;
+  border-radius: 0.625rem;
+}
+
+.bg-red-50.border.border-red-200 {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.03) 100%);
+  border-left-color: #ef4444;
+}
+
+.bg-green-50.border.border-green-200 {
+  background: linear-gradient(135deg, rgba(39, 174, 96, 0.08) 0%, rgba(39, 174, 96, 0.03) 100%);
+  border-left-color: #27AE60;
+}
+
+/* ==================== LOADING STATES ==================== */
+
+.opacity-50 {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.animate-loading {
+  animation: rotateSpin 1s linear infinite;
+}
+
+/* Form Loading State */
+.bg-gray-50.rounded-lg {
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.bg-gray-50.rounded-lg:has(button:disabled) {
+  opacity: 0.8;
+}
+
+/* ==================== ACCESSIBILITY & INTERACTION STATES ==================== */
+
+*:focus {
+  outline: 2px solid transparent;
+}
+
+*:focus-visible {
+  outline: 2px solid #C41E3A;
+  outline-offset: 2px;
+}
+
+/* ==================== DEFAULT STYLES */

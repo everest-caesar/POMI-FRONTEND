@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = (import.meta.env as any).VITE_API_URL || 'http://localhost:3000/api/v1';
 
 interface LoginRequest {
   email: string;
@@ -11,6 +11,10 @@ interface RegisterRequest {
   email: string;
   password: string;
   username: string;
+  age: number;
+  area: string;
+  workOrSchool: string;
+  adminInviteCode?: string;
 }
 
 interface AuthResponse {
@@ -19,15 +23,23 @@ interface AuthResponse {
     _id: string;
     email: string;
     username: string;
+    age?: number;
+    area?: string;
+    workOrSchool?: string;
+    isAdmin?: boolean;
     createdAt: string;
   };
   message: string;
 }
 
-interface User {
+export interface User {
   _id: string;
   email: string;
   username: string;
+  age?: number;
+  area?: string;
+  workOrSchool?: string;
+  isAdmin?: boolean;
   createdAt: string;
 }
 
@@ -58,6 +70,10 @@ class AuthService {
         email: data.email,
         password: data.password,
         username: data.username,
+        age: data.age,
+        area: data.area,
+        workOrSchool: data.workOrSchool,
+        adminInviteCode: data.adminInviteCode,
       });
       return response.data;
     } catch (error: any) {
@@ -82,6 +98,10 @@ class AuthService {
   async getCurrentUser(): Promise<{ user: User }> {
     try {
       const response = await this.api.get<{ user: User }>('/auth/me');
+      // Store user data including new fields if available
+      if (response.data.user) {
+        localStorage.setItem('userData', JSON.stringify(response.data.user));
+      }
       return response.data;
     } catch (error: any) {
       const message = error.response?.data?.error || 'Failed to fetch user';
@@ -103,6 +123,22 @@ class AuthService {
 
   isAuthenticated(): boolean {
     return !!this.getToken();
+  }
+
+  getUserData(): User | null {
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+      try {
+        return JSON.parse(userData);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  clearUserData(): void {
+    localStorage.removeItem('userData');
   }
 }
 

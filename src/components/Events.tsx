@@ -1,4 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+
+const getStoredUserId = () => {
+  if (typeof window === 'undefined') {
+    return null
+  }
+  try {
+    const stored = localStorage.getItem('userData')
+    if (!stored) {
+      return null
+    }
+    const parsed = JSON.parse(stored)
+    return parsed?._id ?? parsed?.id ?? null
+  } catch {
+    return null
+  }
+}
 
 interface Event {
   _id: string
@@ -11,9 +27,10 @@ interface Event {
   category: string
   organizer: string
   maxAttendees?: number
-  attendees: string[]
+  attendees: Array<string | { _id: string }>
   price?: number
   isFree?: boolean
+  ticketLink?: string
   createdAt: string
 }
 
@@ -31,10 +48,7 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
   const [showForm, setShowForm] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [category, setCategory] = useState('all')
-  const [rsvpingEventId, setRsvpingEventId] = useState<string | null>(null)
   const [submissionMessage, setSubmissionMessage] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
-  const [userId, setUserId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -45,11 +59,23 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
     category: 'cultural',
     maxAttendees: '',
     price: '',
+    ticketLink: '',
   })
 
   useEffect(() => {
     fetchEvents()
   }, [category])
+
+  useEffect(() => {
+    if (!selectedEvent) {
+      return
+    }
+
+    const latest = events.find((event) => event._id === selectedEvent._id)
+    if (latest && latest !== selectedEvent) {
+      setSelectedEvent(latest)
+    }
+  }, [events, selectedEvent])
 
   const fetchEvents = async () => {
     try {
@@ -150,6 +176,7 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
         category: 'cultural',
         maxAttendees: '',
         price: '',
+        ticketLink: '',
       })
       setShowForm(false)
       setSubmissionMessage(
@@ -163,76 +190,13 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
     }
   }
 
-  const handleRSVPClick = async (e: React.MouseEvent, eventId: string) => {
-    e.stopPropagation()
-
-    if (!token) {
-      setError('Please login to RSVP for events')
-      return
+  const openTicketLink = (link: string | undefined, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation()
     }
-
-    await handleRSVP(eventId)
-  }
-
-  const handleRSVP = async (eventId: string) => {
-    try {
-      setRsvpingEventId(eventId)
-      const response = await fetch(`http://localhost:3000/api/v1/events/${eventId}/rsvp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: 'going' }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to RSVP')
-      }
-
-      const data = await response.json()
-      setSuccessMessage(data.message || 'Successfully registered for event!')
-      setError('')
-      setTimeout(() => setSuccessMessage(''), 5000)
-      await fetchEvents()
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setRsvpingEventId(null)
+    if (link) {
+      window.open(link, '_blank')
     }
-  }
-
-  const handleCancelRSVP = async (eventId: string) => {
-    try {
-      setRsvpingEventId(eventId)
-      const response = await fetch(`http://localhost:3000/api/v1/events/${eventId}/rsvp`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to cancel registration')
-      }
-
-      const data = await response.json()
-      setSuccessMessage(data.message || 'Successfully cancelled registration!')
-      setError('')
-      setTimeout(() => setSuccessMessage(''), 5000)
-      await fetchEvents()
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setRsvpingEventId(null)
-    }
-  }
-
-  const isUserAttending = (event: Event) => {
-    return token && event.attendees && userId && event.attendees.includes(userId)
   }
 
   const formatDate = (dateString: string) => {
@@ -297,27 +261,12 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
                 <h3 className="font-bold text-gray-700 mb-2">👤 Organizer</h3>
                 <p className="text-gray-600">{selectedEvent.organizer}</p>
               </div>
-              <div>
-                <h3 className="font-bold text-gray-700 mb-2">👥 Attendees</h3>
-                <p className="text-gray-600">
-                  {selectedEvent.attendees.length}
-                  {selectedEvent.maxAttendees ? ` / ${selectedEvent.maxAttendees}` : ''} going
-                </p>
-              </div>
-              {isUserAttending(selectedEvent) ? (
+              {selectedEvent.ticketLink && (
                 <button
-                  onClick={() => handleCancelRSVP(selectedEvent._id)}
-                  disabled={rsvpingEventId === selectedEvent._id}
-                  className="w-full bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg font-bold transition disabled:opacity-50"
+                  onClick={() => openTicketLink(selectedEvent.ticketLink)}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold transition flex items-center justify-center gap-2"
                 >
-                  {rsvpingEventId === selectedEvent._id ? 'Cancelling...' : 'Cancel Registration'}
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleRSVP(selectedEvent._id)}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold transition"
-                >
-                  RSVP to Event
+                  🎫 Get Tickets
                 </button>
               )}
             </div>
@@ -338,12 +287,6 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
       {submissionMessage && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
           {submissionMessage}
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
-          ✅ {successMessage}
         </div>
       )}
 
@@ -392,144 +335,170 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
       </div>
 
       {token && showForm && (
-        <form onSubmit={handleCreateEvent} className="bg-gray-50 rounded-lg p-6 space-y-4">
-          <div>
-            <label className="block text-gray-700 font-semibold mb-2">Event Title *</label>
-            <input
-              type="text"
-              required
-              value={formData.title}
-              onChange={(e) => {
-                setFormData({ ...formData, title: e.target.value })
-                if (error) setError('')
-              }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
-              placeholder="Enter event title"
-            />
-          </div>
-
-          <div>
-            <label className="block text-gray-700 font-semibold mb-2">Description (min 10 characters)</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => {
-                setFormData({ ...formData, description: e.target.value })
-                if (error) setError('')
-              }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
-              placeholder="Describe your event"
-              rows={3}
-            />
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2">Location *</label>
-              <input
-                type="text"
-                required
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
-                placeholder="Event location"
-              />
-            </div>
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2">Category *</label>
-              <select
-                required
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4 overflow-y-auto">
+          <form onSubmit={handleCreateEvent} className="relative bg-white rounded-lg p-8 space-y-4 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold"
               >
-                <option value="cultural">Cultural</option>
-                <option value="business">Business</option>
-                <option value="social">Social</option>
-                <option value="educational">Educational</option>
-                <option value="sports">Sports</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-          </div>
+                ×
+              </button>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Event</h2>
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">Event Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.title}
+                  onChange={(e) => {
+                    setFormData({ ...formData, title: e.target.value })
+                    if (error) setError('')
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
+                  placeholder="Enter event title"
+                />
+              </div>
 
-          <div className="grid md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2">Date * (future date)</label>
-              <input
-                type="date"
-                required
-                value={formData.date}
-                onChange={(e) => {
-                  setFormData({ ...formData, date: e.target.value })
-                  if (error) setError('')
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
-              />
-            </div>
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2">Start Time *</label>
-              <input
-                type="time"
-                required
-                value={formData.startTime}
-                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
-              />
-            </div>
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2">End Time *</label>
-              <input
-                type="time"
-                required
-                value={formData.endTime}
-                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
-              />
-            </div>
-          </div>
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">Description (min 10 characters)</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => {
+                    setFormData({ ...formData, description: e.target.value })
+                    if (error) setError('')
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
+                  placeholder="Describe your event"
+                  rows={3}
+                />
+              </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2">Max Attendees</label>
-              <input
-                type="number"
-                value={formData.maxAttendees}
-                onChange={(e) => setFormData({ ...formData, maxAttendees: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
-                placeholder="Leave empty for unlimited"
-                min="1"
-              />
-            </div>
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2">Price ($ - Leave empty for free)</label>
-              <input
-                type="number"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
-                placeholder="0.00"
-                step="0.01"
-                min="0"
-              />
-            </div>
-          </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">Location *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
+                    placeholder="Event location"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">Category *</label>
+                  <select
+                    required
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
+                  >
+                    <option value="cultural">Cultural</option>
+                    <option value="business">Business</option>
+                    <option value="social">Social</option>
+                    <option value="educational">Educational</option>
+                    <option value="sports">Sports</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
 
-          <div className="flex gap-4">
-            <button
-              type="submit"
-              className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold transition"
-            >
-              Create Event
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="border border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-3 rounded-lg font-bold transition"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">Date * (future date)</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.date}
+                    onChange={(e) => {
+                      setFormData({ ...formData, date: e.target.value })
+                      if (error) setError('')
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">Start Time *</label>
+                  <input
+                    type="time"
+                    required
+                    value={formData.startTime}
+                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">End Time *</label>
+                  <input
+                    type="time"
+                    required
+                    value={formData.endTime}
+                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">Max Attendees</label>
+                  <input
+                    type="number"
+                    value={formData.maxAttendees}
+                    onChange={(e) => setFormData({ ...formData, maxAttendees: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
+                    placeholder="Leave empty for unlimited"
+                    min="1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">Price ($ - Leave empty for free)</label>
+                  <input
+                    type="number"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">🎫 Ticket Sales Link (Eventbrite, etc.) *</label>
+                <input
+                  type="url"
+                  required
+                  value={formData.ticketLink}
+                  onChange={(e) => {
+                    setFormData({ ...formData, ticketLink: e.target.value })
+                    if (error) setError('')
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none text-black bg-white"
+                  placeholder="https://www.eventbrite.com/e/... or your ticket sales link"
+                />
+                <p className="text-sm text-gray-500 mt-1">Where attendees can purchase tickets or register for your event</p>
+              </div>
+
+              <div className="flex gap-4 pt-4 border-t">
+                <button
+                  type="submit"
+                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold transition"
+                >
+                  Create Event
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="border border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-3 rounded-lg font-bold transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+        </div>
       )}
 
       {loading && <p className="text-gray-600">Loading events...</p>}
@@ -594,33 +563,16 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-2 pt-4 border-t">
-              <span className="text-sm text-gray-600">
-                👥 {event.attendees.length} attending
-              </span>
-              {isUserAttending(event) ? (
+            <div className="pt-4 border-t">
+              {event.ticketLink ? (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleCancelRSVP(event._id)
-                  }}
-                  disabled={rsvpingEventId === event._id}
-                  className="px-4 py-2 rounded font-semibold text-sm transition bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50"
+                  onClick={(e) => openTicketLink(event.ticketLink, e)}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-semibold text-sm transition flex items-center justify-center gap-2"
                 >
-                  {rsvpingEventId === event._id ? 'Cancelling...' : 'Cancel RSVP'}
+                  🎫 Get Tickets
                 </button>
               ) : (
-                <button
-                  onClick={(e) => handleRSVPClick(e, event._id)}
-                  disabled={rsvpingEventId === event._id}
-                  className={`px-4 py-2 rounded font-semibold text-sm transition ${
-                    token
-                      ? 'bg-red-600 hover:bg-red-700 text-white disabled:opacity-50'
-                      : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                  }`}
-                >
-                  {rsvpingEventId === event._id ? 'RSVPing...' : token ? 'RSVP' : 'Login to RSVP'}
-                </button>
+                <p className="text-sm text-gray-500 text-center italic">No ticket link available</p>
               )}
             </div>
           </div>
