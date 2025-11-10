@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { API_BASE_URL } from '../config/api'
 
 const getStoredUserId = () => {
   if (typeof window === 'undefined') {
@@ -81,8 +82,8 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
     try {
       setLoading(true)
       const url = category === 'all'
-        ? `http://localhost:3000/api/v1/events`
-        : `http://localhost:3000/api/v1/events?category=${category}`
+        ? `${API_BASE_URL}/events`
+        : `${API_BASE_URL}/events?category=${category}`
 
       const headers: Record<string, string> | undefined = token
         ? { Authorization: `Bearer ${token}` }
@@ -148,7 +149,7 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/v1/events', {
+      const response = await fetch(`${API_BASE_URL}/events`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

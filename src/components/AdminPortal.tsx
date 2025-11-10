@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import BusinessUpload from './BusinessUpload'
-
-const API_BASE_URL =
-  (import.meta.env as any).VITE_API_URL || 'http://localhost:3000/api/v1'
+import { API_BASE_URL } from '../config/api'
 
 interface AdminPortalProps {
   token: string

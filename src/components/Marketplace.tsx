@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { API_BASE_URL } from '../config/api'
 
 type CategoryId =
   | 'all'
@@ -300,7 +301,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
   const fetchListings = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:3000/api/v1/marketplace/listings?limit=60', {
+      const response = await fetch(`${API_BASE_URL}/marketplace/listings?limit=60`, {
         headers: token
           ? {
               Authorization: `Bearer ${token}`,
@@ -424,7 +425,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
 
     try {
       const response = await fetch(
-        `http://localhost:3000/api/v1/marketplace/listings/${listingId}/favorite`,
+        `${API_BASE_URL}/marketplace/listings/${listingId}/favorite`,
         {
           method: 'POST',
           headers: {
@@ -505,7 +506,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
       const form = new FormData()
       selectedImages.forEach((file) => form.append('images', file))
 
-      const response = await fetch('http://localhost:3000/api/v1/marketplace/upload', {
+      const response = await fetch(`${API_BASE_URL}/marketplace/upload`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -572,7 +573,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/v1/marketplace/listings', {
+      const response = await fetch(`${API_BASE_URL}/marketplace/listings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
