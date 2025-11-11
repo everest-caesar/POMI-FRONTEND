@@ -442,6 +442,15 @@ function App() {
               )}
             </button>
             {isLoggedIn ? (
+              <button
+                onClick={() => navigate('/messages')}
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white/80 transition hover:border-white/40 hover:text-white"
+                aria-label="Go to direct messages"
+              >
+                ✉️ Messages
+              </button>
+            ) : null}
+            {isLoggedIn ? (
               <>
                 <span className="hidden text-sm text-white/70 md:block">
                   Welcome, <span className="font-semibold text-white">{currentUser?.username || 'Friend'}</span>

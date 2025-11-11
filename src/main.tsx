@@ -6,6 +6,7 @@ import MarketplacePage from './pages/MarketplacePage'
 import BusinessDirectoryPage from './pages/BusinessDirectoryPage'
 import ForumPage from './pages/ForumPage'
 import AdminAccessPage from './pages/AdminAccessPage'
+import MessagesPage from './pages/MessagesPage'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -16,6 +17,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/marketplace" element={<MarketplacePage />} />
         <Route path="/forums" element={<ForumPage />} />
         <Route path="/business" element={<BusinessDirectoryPage />} />
+        <Route path="/messages" element={<MessagesPage />} />
         <Route path="/*" element={<App />} />
       </Routes>
     </BrowserRouter>
