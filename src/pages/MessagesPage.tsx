@@ -48,7 +48,8 @@ export default function MessagesPage() {
             </span>
             <button
               onClick={() => {
-                authService.logout()
+                authService.removeToken()
+                authService.clearUserData()
                 navigate('/')
               }}
               className="rounded-full bg-white/10 border border-white/20 px-4 py-2 text-sm font-semibold text-white/80 hover:text-white hover:bg-white/20 transition"
