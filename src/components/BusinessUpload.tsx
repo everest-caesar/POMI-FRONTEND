@@ -234,7 +234,7 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
                 className="w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-white focus:border-rose-300 focus:outline-none"
               >
                 {CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
+                  <option key={cat.value} value={cat.value} className="bg-slate-800 text-white">
                     {cat.label}
                   </option>
                 ))}
