@@ -1393,15 +1393,38 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
             <form
               onSubmit={async (e) => {
                 e.preventDefault()
-                if (!messageText.trim()) {
+                if (!messageText.trim() || !messagingListing) {
                   setError('Please write a message')
                   return
                 }
 
                 setSendingMessage(true)
                 try {
-                  // In a full implementation, this would send to your messaging backend
-                  // For now, we'll show a success message
+                  // Get seller ID from marketplace listing
+                  const listingResponse = await fetch(`${API_BASE_URL}/marketplace/listings/${messagingListing._id}`, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+                  })
+                  const listingData = await listingResponse.json()
+                  const sellerId = (listingData.data.sellerId as any)?._id || (listingData.data.sellerId as any)?.id
+
+                  // Send message via REST API
+                  const messageResponse = await fetch(`${API_BASE_URL}/messages`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      recipientId: sellerId,
+                      content: messageText.trim(),
+                      listingId: messagingListing._id,
+                    }),
+                  })
+
+                  if (!messageResponse.ok) {
+                    throw new Error('Failed to send message')
+                  }
+
                   setSubmissionMessage(
                     `Message sent to ${messagingListing.sellerName}! They'll get back to you soon. 🎉`
                   )
