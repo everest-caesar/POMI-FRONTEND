@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import BusinessUpload from './BusinessUpload'
+import EventCreationForm from './EventCreationForm'
 import { API_BASE_URL } from '../config/api'
 
 interface AdminPortalProps {
@@ -117,6 +118,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
   const [moderatingEventId, setModeratingEventId] = useState<string | null>(null)
   const [moderatingListingId, setModeratingListingId] = useState<string | null>(null)
   const [showBusinessUpload, setShowBusinessUpload] = useState(false)
+  const [showEventCreation, setShowEventCreation] = useState(false)
 
   const fetchJson = async (
     path: string,
@@ -554,10 +556,30 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                       Upcoming gatherings curated by the community team.
                     </p>
                   </div>
-                  <span className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-white/70">
-                    {events.length} tracked
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowEventCreation(!showEventCreation)}
+                      className="inline-flex items-center gap-2 rounded-full border border-rose-300/40 bg-rose-500/20 px-4 py-2 text-xs font-semibold text-rose-100 hover:bg-rose-500/30"
+                    >
+                      {showEventCreation ? '✕ Cancel' : '+ Create Event'}
+                    </button>
+                    <span className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-white/70">
+                      {events.length} tracked
+                    </span>
+                  </div>
                 </div>
+
+                {showEventCreation && (
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-slate-900/40 backdrop-blur">
+                    <EventCreationForm
+                      onSuccess={() => {
+                        setShowEventCreation(false)
+                        loadAdminData()
+                      }}
+                      onCancel={() => setShowEventCreation(false)}
+                    />
+                  </div>
+                )}
 
                 {events.length === 0 ? (
                   <div className="rounded-3xl border border-white/10 bg-white/5 px-6 py-10 text-center text-white/70 shadow-lg shadow-slate-900/30 backdrop-blur">
