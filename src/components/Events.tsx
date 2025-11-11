@@ -61,6 +61,7 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
     maxAttendees: '',
     price: '',
     ticketLink: '',
+    socialMediaLink: '',
   })
 
   useEffect(() => {
@@ -178,6 +179,7 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
         maxAttendees: '',
         price: '',
         ticketLink: '',
+        socialMediaLink: '',
       })
       setShowForm(false)
       setSubmissionMessage(

@@ -12,6 +12,7 @@ interface EventFormData {
   maxAttendees?: string
   price?: string
   ticketLink?: string
+  socialMediaLink?: string
 }
 
 interface EventCreationFormProps {
@@ -45,6 +46,7 @@ export default function EventCreationForm({ onSuccess, onCancel }: EventCreation
     maxAttendees: '',
     price: '',
     ticketLink: '',
+    socialMediaLink: '',
   })
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -119,6 +121,7 @@ export default function EventCreationForm({ onSuccess, onCancel }: EventCreation
         maxAttendees: '',
         price: '',
         ticketLink: '',
+        socialMediaLink: '',
       })
 
       // Call onSuccess after a short delay
@@ -259,6 +262,19 @@ export default function EventCreationForm({ onSuccess, onCancel }: EventCreation
                 onChange={handleInputChange}
                 className="w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-white placeholder:text-white/40 focus:border-rose-300 focus:outline-none"
                 placeholder="https://example.com/tickets"
+              />
+            </div>
+
+            {/* Social Media Link */}
+            <div>
+              <label className="block text-sm font-semibold text-white mb-2">Social Media Link</label>
+              <input
+                type="url"
+                name="socialMediaLink"
+                value={formData.socialMediaLink}
+                onChange={handleInputChange}
+                className="w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-white placeholder:text-white/40 focus:border-rose-300 focus:outline-none"
+                placeholder="https://instagram.com/event or https://facebook.com/event"
               />
             </div>
           </div>
