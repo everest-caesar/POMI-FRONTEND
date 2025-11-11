@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import axiosInstance from '../utils/axios';
 import authService from '../services/authService';
 const CATEGORY_DISPLAY_MAP = {
     retail: 'Retail & Shopping',
@@ -28,7 +28,7 @@ export default function BusinessDirectoryPage() {
             try {
                 setLoading(true);
                 setError(null);
-                const response = await axios.get('/api/v1/businesses', {
+                const response = await axiosInstance.get('/businesses', {
                     params: {
                         status: 'active',
                         limit: 100,

@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useState, useRef, useCallback } from 'react';
-import axios from 'axios';
+import axiosInstance from '../utils/axios';
 export default function MarketplaceUpload({ listingId, onUploadComplete, maxFiles = 5, maxFileSize = 10, }) {
     const fileInputRef = useRef(null);
     const [selectedFiles, setSelectedFiles] = useState([]);
@@ -74,11 +74,9 @@ export default function MarketplaceUpload({ listingId, onUploadComplete, maxFile
             if (listingId) {
                 formData.append('listingId', listingId);
             }
-            const token = localStorage.getItem('token');
-            const response = await axios.post('/api/v1/marketplace/upload', formData, {
+            const response = await axiosInstance.post('/marketplace/upload', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
                 onUploadProgress: (progressEvent) => {
                     const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));

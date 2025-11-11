@@ -1,5 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config/api';
 const getStoredUserId = () => {
     if (typeof window === 'undefined') {
         return null;
@@ -35,6 +36,7 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
         maxAttendees: '',
         price: '',
         ticketLink: '',
+        socialMediaLink: '',
     });
     useEffect(() => {
         fetchEvents();
@@ -52,8 +54,8 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
         try {
             setLoading(true);
             const url = category === 'all'
-                ? `http://localhost:3000/api/v1/events`
-                : `http://localhost:3000/api/v1/events?category=${category}`;
+                ? `${API_BASE_URL}/events`
+                : `${API_BASE_URL}/events?category=${category}`;
             const headers = token
                 ? { Authorization: `Bearer ${token}` }
                 : undefined;
@@ -108,7 +110,7 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
             return;
         }
         try {
-            const response = await fetch('http://localhost:3000/api/v1/events', {
+            const response = await fetch(`${API_BASE_URL}/events`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -135,6 +137,7 @@ export default function Events({ onClose, token, isAdmin = false, onRequestAdmin
                 maxAttendees: '',
                 price: '',
                 ticketLink: '',
+                socialMediaLink: '',
             });
             setShowForm(false);
             setSubmissionMessage(isAdmin

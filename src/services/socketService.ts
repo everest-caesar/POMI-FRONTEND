@@ -11,10 +11,21 @@ class SocketService {
    * Connect to Socket.io server
    */
   connect(userId: string): void {
-    if (this.socket?.connected) {
+    if (!userId) {
+      console.warn('Socket connection skipped: missing user ID');
+      return;
+    }
+
+    if (this.socket?.connected && this.userId === userId) {
       return; // Already connected
     }
 
+    const token = authService.getToken();
+
+    if (!token) {
+      console.warn('Socket connection skipped: missing auth token');
+      return;
+    }
     this.userId = userId;
 
     // Get the base URL and replace /api/v1 with just the domain
@@ -32,8 +43,17 @@ class SocketService {
     this.socket.on('connect', () => {
       console.log('📡 Socket connected:', this.socket?.id);
       if (this.userId) {
-        this.socket?.emit('authenticate', this.userId);
+        this.socket?.emit('authenticate', { token });
       }
+    });
+
+    this.socket.on('auth:success', () => {
+      console.log('✅ Socket authenticated');
+    });
+
+    this.socket.on('auth:error', (message: string) => {
+      console.error('❌ Socket authentication failed:', message);
+      this.disconnect();
     });
 
     // Handle incoming messages

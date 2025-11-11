@@ -11,7 +11,7 @@ export default function MessagesPage() {
   useEffect(() => {
     // Redirect to login if not authenticated
     if (!token || !user) {
-      navigate('/login')
+      navigate('/', { replace: true, state: { requireAuth: true } })
       return
     }
   }, [token, user, navigate])

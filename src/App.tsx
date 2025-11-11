@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import './App.css'
 import authService, { User as AuthUser } from './services/authService'
 import Events from './components/Events'
@@ -213,6 +213,7 @@ function App() {
   const [messageDraft, setMessageDraft] = useState('')
   const [inboxFilter, setInboxFilter] = useState<'updates' | 'sent'>('updates')
   const navigate = useNavigate()
+  const location = useLocation()
 
   const features = useMemo(() => {
     return [...BASE_FEATURES]
@@ -248,6 +249,14 @@ function App() {
       // ignore storage write errors
     }
   }, [unreadAdminMessages])
+
+  useEffect(() => {
+    if ((location.state as any)?.requireAuth) {
+      setAuthMode('login')
+      setShowAuthModal(true)
+      navigate(`${location.pathname}${location.search}${location.hash}`, { replace: true })
+    }
+  }, [location, navigate])
 
   useEffect(() => {
     if (!authService.isAuthenticated()) {

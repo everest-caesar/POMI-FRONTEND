@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import axiosInstance from '../utils/axios';
 import socketService from '../services/socketService';
-import authService from '../services/authService';
 
 interface Message {
   _id: string;
@@ -19,12 +18,31 @@ interface Conversation {
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
+  hasListing?: boolean;
+  lastListingId?: string | null;
+}
+
+interface ListingSummary {
+  _id: string;
+  title: string;
+  price?: number;
+  location?: string;
+  status?: string;
+  images?: string[];
 }
 
 interface MessagingProps {
   currentUserId: string;
   currentUserName: string;
 }
+
+const formatPrice = (value?: number) => {
+  if (value === null || value === undefined) return '—';
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(value);
+};
 
 export default function Messaging({ currentUserId, currentUserName }: MessagingProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -35,8 +53,56 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
   const [error, setError] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const [conversationsLoading, setConversationsLoading] = useState(true);
+  const [conversationsError, setConversationsError] = useState('');
+  const [activeListing, setActiveListing] = useState<ListingSummary | null>(null);
+  const [listingConversationId, setListingConversationId] = useState<string | null>(null);
+  const [listingLoading, setListingLoading] = useState(false);
+  const [listingError, setListingError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const activeConversationIdRef = useRef<string | null>(null);
+
+  const fetchConversations = useCallback(async () => {
+    try {
+      setConversationsLoading(true);
+      const response = await axiosInstance.get('/messages');
+      setConversations(response.data.data);
+      setConversationsError('');
+    } catch (err: any) {
+      console.error('Failed to fetch conversations:', err);
+      setConversationsError('Failed to load conversations');
+    } finally {
+      setConversationsLoading(false);
+    }
+  }, []);
+
+  const fetchListingDetails = useCallback(
+    async (listingId: string, conversationId: string) => {
+      try {
+        setListingLoading(true);
+        setListingError('');
+        setListingConversationId(conversationId);
+        const response = await axiosInstance.get(`/marketplace/listings/${listingId}`);
+        if (activeConversationIdRef.current !== conversationId) {
+          return;
+        }
+        setActiveListing(response.data.data);
+      } catch (err: any) {
+        console.error('Failed to fetch listing details:', err);
+        if (activeConversationIdRef.current === conversationId) {
+          setListingError('Unable to load listing details right now');
+          setActiveListing(null);
+          setListingConversationId(null);
+        }
+      } finally {
+        if (activeConversationIdRef.current === conversationId) {
+          setListingLoading(false);
+        }
+      }
+    },
+    [],
+  );
 
   // Initialize Socket.io connection
   useEffect(() => {
@@ -44,8 +110,11 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
 
     // Listen for incoming messages
     const handleMessageReceive = (data: any) => {
+      const isActiveConversation =
+        selectedConversation && data.senderId === selectedConversation.userId;
+
       // Add received message to current conversation if it's from the selected user
-      if (selectedConversation && data.senderId === selectedConversation.userId) {
+      if (isActiveConversation) {
         setMessages((prev) => [
           ...prev,
           {
@@ -59,19 +128,41 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
         ]);
       }
 
+      let hasConversation = false;
       // Update conversation last message
-      setConversations((prev) =>
-        prev.map((conv) =>
+      setConversations((prev) => {
+        const exists = prev.some((conv) => conv.userId === data.senderId);
+        hasConversation = exists;
+        if (!exists) {
+          return prev;
+        }
+
+        return prev.map((conv) =>
           conv.userId === data.senderId
             ? {
                 ...conv,
                 lastMessage: data.content,
                 lastMessageTime: new Date().toISOString(),
-                unreadCount: conv.unreadCount + 1,
+                unreadCount: isActiveConversation ? 0 : conv.unreadCount + 1,
+                hasListing: conv.hasListing || Boolean(data.listingId),
+                lastListingId: data.listingId || conv.lastListingId,
               }
             : conv
-        )
-      );
+        );
+      });
+
+      if (!hasConversation) {
+        fetchConversations();
+      }
+
+      if (
+        isActiveConversation &&
+        data.listingId &&
+        selectedConversation &&
+        listingConversationId !== selectedConversation.userId
+      ) {
+        void fetchListingDetails(data.listingId, selectedConversation.userId);
+      }
     };
 
     const handleTypingStart = (data: any) => {
@@ -113,23 +204,16 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
       socketService.off('typing:stop', handleTypingStop);
       socketService.off('user:online', handleUserOnline);
       socketService.off('user:offline', handleUserOffline);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
     };
-  }, [selectedConversation, currentUserId]);
+  }, [selectedConversation, currentUserId, fetchConversations, fetchListingDetails, listingConversationId]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  const fetchConversations = async () => {
-    try {
-      const response = await axiosInstance.get('/messages');
-      setConversations(response.data.data);
-    } catch (err: any) {
-      console.error('Failed to fetch conversations:', err);
-      setError('Failed to load conversations');
-    }
-  };
 
   const fetchMessages = useCallback(async (recipientId: string) => {
     try {
@@ -137,19 +221,41 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
       const response = await axiosInstance.get(`/messages/${recipientId}`);
       setMessages(response.data.data);
       setError('');
+      return response.data.data as Message[];
     } catch (err: any) {
       console.error('Failed to fetch messages:', err);
       setError('Failed to load messages');
+      return null;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const handleSelectConversation = (conversation: Conversation) => {
+  const resolveListingIdForConversation = useCallback(() => {
+    if (!selectedConversation) return null;
+    const messageWithListing = messages.find((msg) => Boolean(msg.listingId));
+    return messageWithListing?.listingId || selectedConversation.lastListingId || null;
+  }, [messages, selectedConversation]);
+
+  const handleSelectConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
-    fetchMessages(conversation.userId);
+    activeConversationIdRef.current = conversation.userId;
     setMessageInput('');
     setIsTyping(false);
+    setActiveListing(null);
+    setListingConversationId(null);
+    setListingError('');
+    setListingLoading(false);
+
+    const fetched = await fetchMessages(conversation.userId);
+    const nextListingId =
+      fetched?.find((msg) => Boolean(msg.listingId))?.listingId ||
+      conversation.lastListingId ||
+      null;
+
+    if (nextListingId) {
+      void fetchListingDetails(nextListingId, conversation.userId);
+    }
 
     // Reset unread count
     setConversations((prev) =>
@@ -166,17 +272,22 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
       return;
     }
 
+    const trimmedMessage = messageInput.trim();
+    const listingContextId = resolveListingIdForConversation();
+
     try {
       // First save to database via REST API
       await axiosInstance.post('/messages', {
         recipientId: selectedConversation.userId,
-        content: messageInput.trim(),
+        content: trimmedMessage,
+        listingId: listingContextId || undefined,
       });
 
       // Then send via Socket.io for real-time delivery
       socketService.sendMessage(
         selectedConversation.userId,
-        messageInput.trim()
+        trimmedMessage,
+        listingContextId || undefined
       );
 
       // Add message to UI immediately
@@ -186,9 +297,10 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
           _id: Math.random().toString(),
           senderId: currentUserId,
           senderName: currentUserName,
-          content: messageInput.trim(),
+          content: trimmedMessage,
           createdAt: new Date().toISOString(),
           isRead: false,
+          listingId: listingContextId || undefined,
         },
       ]);
 
@@ -201,8 +313,10 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
           conv.userId === selectedConversation.userId
             ? {
                 ...conv,
-                lastMessage: messageInput.trim(),
+                lastMessage: trimmedMessage,
                 lastMessageTime: new Date().toISOString(),
+                hasListing: conv.hasListing || Boolean(listingContextId),
+                lastListingId: listingContextId || conv.lastListingId,
               }
             : conv
         )
@@ -237,7 +351,23 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
     ? onlineUsers.has(selectedConversation.userId)
     : false;
 
-  if (conversations.length === 0 && !loading) {
+  if (conversationsLoading && conversations.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 text-center">
+        <span className="text-gray-400 text-sm">Loading conversations...</span>
+      </div>
+    );
+  }
+
+  if (conversationsError && conversations.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 text-center">
+        <span className="text-sm text-rose-500">{conversationsError}</span>
+      </div>
+    );
+  }
+
+  if (conversations.length === 0 && !loading && !conversationsError) {
     return (
       <div className="flex flex-col items-center justify-center h-96 text-center">
         <span className="text-6xl mb-4">💬</span>
@@ -254,13 +384,16 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
         <div className="p-4 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900">Messages</h2>
           <p className="text-xs text-gray-500">Direct conversations</p>
+          {conversationsError && (
+            <p className="mt-2 text-xs text-red-600">{conversationsError}</p>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {conversations.map((conversation) => (
             <button
               key={conversation.userId}
-              onClick={() => handleSelectConversation(conversation)}
+              onClick={() => void handleSelectConversation(conversation)}
               className={`w-full p-4 border-b border-gray-50 text-left transition ${
                 selectedConversation?.userId === conversation.userId
                   ? 'bg-red-50 border-l-4 border-l-red-500'
@@ -284,6 +417,11 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
                   <p className="text-xs text-gray-500 line-clamp-1">
                     {conversation.lastMessage}
                   </p>
+                  {conversation.hasListing && (
+                    <p className="text-[11px] font-semibold text-amber-600">
+                      Listing inquiry
+                    </p>
+                  )}
                   <p className="text-xs text-gray-400 mt-1">
                     {new Date(conversation.lastMessageTime).toLocaleDateString()}
                   </p>
@@ -319,6 +457,49 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+              {listingConversationId === selectedConversation.userId && (
+                <>
+                  {listingLoading ? (
+                    <div className="rounded-2xl border border-white/60 bg-white p-4 text-sm text-gray-500 shadow">
+                      Loading listing details...
+                    </div>
+                  ) : listingError ? (
+                    <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-600 shadow">
+                      {listingError}
+                    </div>
+                  ) : activeListing ? (
+                    <div className="flex items-center gap-4 rounded-2xl border border-white/80 bg-white p-4 shadow">
+                      {activeListing.images?.length ? (
+                        <img
+                          src={activeListing.images[0]}
+                          alt={activeListing.title}
+                          className="h-16 w-16 rounded-xl object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gray-100 text-2xl">
+                          🛍️
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {activeListing.title}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {activeListing.location || 'Location TBD'}
+                        </p>
+                        <p className="text-sm font-bold text-gray-900">
+                          {formatPrice(activeListing.price)}
+                        </p>
+                        {activeListing.status && (
+                          <p className="text-xs text-gray-500 capitalize">
+                            Status: {activeListing.status.toLowerCase()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              )}
               {loading ? (
                 <div className="flex items-center justify-center h-full">
                   <span className="text-gray-400">Loading messages...</span>

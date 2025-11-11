@@ -30,9 +30,19 @@ interface AdminAttendee {
 interface AdminEvent {
   id: string
   title: string
+  description?: string
   date: string
   category: string
   location: string
+  startTime?: string
+  endTime?: string
+  maxAttendees?: number | null
+  tags?: string[]
+  price?: number | null
+  isFree?: boolean
+  ticketLink?: string | null
+  socialMediaLink?: string | null
+  image?: string | null
   organizer: string
   organizerProfile?: {
     id?: string
@@ -113,6 +123,14 @@ const formatDate = (value: string | Date | undefined) => {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+const formatCurrency = (value?: number | null) => {
+  if (value === null || value === undefined) return 'N/A'
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(value)
 }
 
 export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProps) {
@@ -655,77 +673,166 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                             </p>
                           )}
 
-                          <div className="mt-4 grid gap-6 md:grid-cols-[1.2fr,1fr]">
-                            <dl className="grid gap-3 text-sm text-white/80">
-                              <div>
-                                <dt className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">
-                                  Title
-                                </dt>
-                                <dd className="text-lg font-semibold text-white">
-                                  {event.title}
-                                </dd>
-                              </div>
-                              <div className="flex flex-wrap gap-3 text-xs text-white/60">
-                                <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1">
-                                  {event.category.toUpperCase()}
-                                </span>
-                                <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1">
-                                  {formatDate(event.date)}
-                                </span>
-                                <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1">
-                                  📍 {event.location}
-                                </span>
-                              </div>
-                              <div>
-                                <dt className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">
-                                  Organiser
-                                </dt>
-                                <dd className="text-sm text-white/80">
-                                  {event.organizerProfile?.username || event.organizer}
-                                  {event.organizerProfile?.email && (
-                                    <span className="text-white/50">
-                                      {' '}
-                                      • {event.organizerProfile.email}
-                                    </span>
-                                  )}
-                                </dd>
-                              </div>
-                            </dl>
+                          {event.image && (
+                            <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+                              <img
+                                src={event.image}
+                                alt={`${event.title} cover`}
+                                className="h-56 w-full object-cover"
+                              />
+                            </div>
+                          )}
 
-                            <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-                              <div className="flex items-center justify-between text-sm font-semibold text-white">
-                                <span>{event.attendeeCount} RSVP</span>
-                                {event.attendeeCount === 0 && (
-                                  <span className="text-xs text-white/60">
-                                    Encourage more promotion
+                          <div className="mt-4 grid gap-6 lg:grid-cols-[1.2fr,1fr]">
+                            <div className="space-y-4">
+                              <dl className="grid gap-3 text-sm text-white/80">
+                                <div>
+                                  <dt className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">
+                                    Title
+                                  </dt>
+                                  <dd className="text-lg font-semibold text-white">
+                                    {event.title}
+                                  </dd>
+                                </div>
+                                <div className="flex flex-wrap gap-3 text-xs text-white/60">
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1">
+                                    {event.category.toUpperCase()}
                                   </span>
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1">
+                                    {formatDate(event.date)}
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1">
+                                    📍 {event.location}
+                                  </span>
+                                </div>
+                                {(event.startTime || event.endTime || event.maxAttendees) && (
+                                  <div className="flex flex-wrap items-center gap-3 text-xs text-white/70">
+                                    {(event.startTime || event.endTime) && (
+                                      <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1">
+                                        ⏰ {event.startTime ?? 'TBD'}
+                                        {event.endTime ? ` – ${event.endTime}` : ''}
+                                      </span>
+                                    )}
+                                    {event.maxAttendees ? (
+                                      <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1">
+                                        👥 Max {event.maxAttendees}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                )}
+                                <div>
+                                  <dt className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">
+                                    Organiser
+                                  </dt>
+                                  <dd className="text-sm text-white/80">
+                                    {event.organizerProfile?.username || event.organizer}
+                                    {event.organizerProfile?.email && (
+                                      <span className="text-white/50">
+                                        {' '}
+                                        • {event.organizerProfile.email}
+                                      </span>
+                                    )}
+                                  </dd>
+                                </div>
+                                {event.description && (
+                                  <div>
+                                    <dt className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">
+                                      Description
+                                    </dt>
+                                    <dd className="text-sm text-white/70 whitespace-pre-line">
+                                      {event.description}
+                                    </dd>
+                                  </div>
+                                )}
+                              </dl>
+
+                              {event.tags && event.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-2 text-[11px] text-white/60">
+                                  {event.tags.map((tag) => (
+                                    <span
+                                      key={tag}
+                                      className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1 uppercase tracking-wide"
+                                    >
+                                      #{tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="space-y-4">
+                              <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80">
+                                <div className="flex items-center justify-between text-white">
+                                  <span>Pricing</span>
+                                  <span className="font-semibold">
+                                    {event.isFree || (!event.price && event.price !== 0)
+                                      ? 'Free'
+                                      : formatCurrency(event.price)}
+                                  </span>
+                                </div>
+                                {typeof event.maxAttendees === 'number' && (
+                                  <div className="flex items-center justify-between text-xs text-white/70">
+                                    <span>Capacity</span>
+                                    <span>{event.maxAttendees}</span>
+                                  </div>
+                                )}
+                                {event.ticketLink && (
+                                  <a
+                                    href={event.ticketLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-white/80 hover:border-emerald-300/60 hover:text-emerald-100"
+                                  >
+                                    🎟️ Ticket link
+                                  </a>
+                                )}
+                                {event.socialMediaLink && (
+                                  <a
+                                    href={event.socialMediaLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-white/80 hover:border-sky-300/60 hover:text-sky-100"
+                                  >
+                                    📣 Promo link
+                                  </a>
                                 )}
                               </div>
-                              {event.attendees.length > 0 ? (
-                                <div className="max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-white/5">
-                                  <table className="w-full text-left text-xs text-white/80">
-                                    <tbody>
-                                      {event.attendees.map((attendee, index) => (
-                                        <tr key={`${attendee.id ?? index}`} className="border-b border-white/10 last:border-b-0">
-                                          <td className="px-4 py-2 font-semibold text-white">
-                                            {attendee.username || 'Member'}
-                                          </td>
-                                          <td className="px-4 py-2 text-white/60">
-                                            {attendee.email || '—'}
-                                          </td>
-                                          <td className="px-4 py-2 text-white/60">
-                                            {[attendee.area, attendee.workOrSchool].filter(Boolean).join(' • ') || '—'}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
+
+                              <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+                                <div className="flex items-center justify-between text-sm font-semibold text-white">
+                                  <span>{event.attendeeCount} RSVP</span>
+                                  {event.attendeeCount === 0 && (
+                                    <span className="text-xs text-white/60">
+                                      Encourage more promotion
+                                    </span>
+                                  )}
                                 </div>
-                              ) : (
-                                <p className="text-xs text-white/60">
-                                  No RSVP data yet.
-                                </p>
-                              )}
+                                {event.attendees.length > 0 ? (
+                                  <div className="max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-white/5">
+                                    <table className="w-full text-left text-xs text-white/80">
+                                      <tbody>
+                                        {event.attendees.map((attendee, index) => (
+                                          <tr key={`${attendee.id ?? index}`} className="border-b border-white/10 last:border-b-0">
+                                            <td className="px-4 py-2 font-semibold text-white">
+                                              {attendee.username || 'Member'}
+                                            </td>
+                                            <td className="px-4 py-2 text-white/60">
+                                              {attendee.email || '—'}
+                                            </td>
+                                            <td className="px-4 py-2 text-white/60">
+                                              {[attendee.area, attendee.workOrSchool].filter(Boolean).join(' • ') || '—'}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-white/60">
+                                    No RSVP data yet.
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </article>

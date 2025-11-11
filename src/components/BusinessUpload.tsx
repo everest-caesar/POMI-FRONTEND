@@ -48,6 +48,8 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const token = authService.getToken()
+  const fieldBaseClass =
+    'w-full rounded-lg border border-white/25 bg-white text-gray-900 placeholder:text-gray-500 px-4 py-2 text-sm shadow-inner focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100'
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -206,7 +208,7 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
                 value={formData.businessName}
                 onChange={handleInputChange}
                 required
-                className="w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-white placeholder:text-white/40 focus:border-rose-300 focus:outline-none"
+                className={fieldBaseClass}
                 placeholder="e.g., Shega Café & Bakery"
               />
             </div>
@@ -218,7 +220,7 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
                 name="category"
                 value={formData.category}
                 onChange={handleInputChange}
-                className="w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-white focus:border-rose-300 focus:outline-none"
+                className={`${fieldBaseClass} bg-white`}
               >
                 {CATEGORIES.map((cat) => (
                   <option key={cat.value} value={cat.value} className="bg-slate-800 text-white">
@@ -236,7 +238,7 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
                 name="phone"
                 value={formData.phone}
                 onChange={handleInputChange}
-                className="w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-white placeholder:text-white/40 focus:border-rose-300 focus:outline-none"
+                className={fieldBaseClass}
                 placeholder="(613) 555-0123"
               />
             </div>
@@ -249,7 +251,7 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                className="w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-white placeholder:text-white/40 focus:border-rose-300 focus:outline-none"
+                className={fieldBaseClass}
                 placeholder="contact@business.com"
               />
             </div>
@@ -263,7 +265,7 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
               name="address"
               value={formData.address}
               onChange={handleInputChange}
-              className="w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-white placeholder:text-white/40 focus:border-rose-300 focus:outline-none"
+              className={fieldBaseClass}
               placeholder="123 Main St, Ottawa, ON"
             />
           </div>
@@ -277,7 +279,7 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
               onChange={handleInputChange}
               required
               rows={4}
-              className="w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-white placeholder:text-white/40 focus:border-rose-300 focus:outline-none"
+              className={`${fieldBaseClass} min-h-[120px] resize-none`}
               placeholder="Describe the business, products/services, and what makes it unique..."
             />
           </div>
