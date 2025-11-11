@@ -85,6 +85,17 @@ interface AdminBusiness {
   } | null
 }
 
+interface CommunityMember {
+  id: string
+  username: string
+  email: string
+  area?: string
+  workOrSchool?: string
+  age?: number
+  isAdmin: boolean
+  joinedAt: string
+}
+
 const STATUS_OPTIONS: Array<AdminBusiness['status']> = [
   'draft',
   'active',
@@ -109,6 +120,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
   const [events, setEvents] = useState<AdminEvent[]>([])
   const [listings, setListings] = useState<AdminListing[]>([])
   const [businesses, setBusinesses] = useState<AdminBusiness[]>([])
+  const [members, setMembers] = useState<CommunityMember[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
@@ -145,17 +157,19 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
     setError(null)
     setStatusMessage(null)
     try {
-      const [overviewData, eventsData, businessesData, listingsData] = await Promise.all([
+      const [overviewData, eventsData, businessesData, listingsData, usersData] = await Promise.all([
         fetchJson('/admin/overview'),
         fetchJson('/admin/events'),
         fetchJson('/admin/businesses'),
         fetchJson('/admin/marketplace'),
+        fetchJson('/admin/users'),
       ])
 
       setMetrics(overviewData.metrics)
       setEvents(eventsData.events || [])
       setBusinesses(businessesData.businesses || [])
       setListings(listingsData.listings || [])
+      setMembers(usersData.users || [])
     } catch (err: any) {
       setError(err.message || 'Failed to load admin data')
     } finally {
@@ -846,6 +860,66 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                         </div>
                       </article>
                     ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Community Members */}
+              <section className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h3 className="flex items-center gap-2 text-xl font-black text-white">
+                      <span className="text-2xl">👥</span> Community members
+                    </h3>
+                    <p className="text-sm text-white/60">
+                      Manage and view all registered community members.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-white/70">
+                    {members.length} members
+                  </span>
+                </div>
+
+                {members.length === 0 ? (
+                  <div className="rounded-3xl border border-white/10 bg-white/5 px-6 py-10 text-center text-white/70 shadow-lg shadow-slate-900/30 backdrop-blur">
+                    No community members yet.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-3xl border border-white/10 bg-white/5 shadow-lg shadow-slate-900/40 backdrop-blur">
+                    <table className="w-full text-sm text-white/80">
+                      <thead>
+                        <tr className="border-b border-white/10">
+                          <th className="px-6 py-4 text-left font-semibold text-white">Username</th>
+                          <th className="px-6 py-4 text-left font-semibold text-white">Email</th>
+                          <th className="px-6 py-4 text-left font-semibold text-white">Area</th>
+                          <th className="px-6 py-4 text-left font-semibold text-white">Work/School</th>
+                          <th className="px-6 py-4 text-left font-semibold text-white">Status</th>
+                          <th className="px-6 py-4 text-left font-semibold text-white">Joined</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {members.map((member, index) => (
+                          <tr key={member.id} className={`border-b border-white/10 last:border-b-0 ${index % 2 === 0 ? 'bg-white/2' : ''}`}>
+                            <td className="px-6 py-4 font-semibold text-white">{member.username}</td>
+                            <td className="px-6 py-4">{member.email}</td>
+                            <td className="px-6 py-4">{member.area || '—'}</td>
+                            <td className="px-6 py-4">{member.workOrSchool || '—'}</td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                                member.isAdmin
+                                  ? 'bg-purple-500/20 text-purple-200 border border-purple-400/40'
+                                  : 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/40'
+                              }`}>
+                                {member.isAdmin ? '👑 Admin' : 'Member'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-white/60">
+                              {formatDate(member.joinedAt)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </section>
