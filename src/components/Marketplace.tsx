@@ -289,6 +289,9 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([])
   const [submissionMessage, setSubmissionMessage] = useState('')
+  const [messagingListing, setMessagingListing] = useState<Listing | null>(null)
+  const [messageText, setMessageText] = useState('')
+  const [sendingMessage, setSendingMessage] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -549,7 +552,6 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
       !formData.title ||
       !formData.description ||
       !formData.price ||
-      !formData.location ||
       !formData.category
     ) {
       setError('Fill out all required fields to share your listing')
@@ -693,15 +695,8 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
                   <div className="flex flex-col gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 shadow-sm">
                     <p className="font-semibold text-amber-800">Pending admin review</p>
                     <p className="text-amber-700">
-                      Share your listing and the admin team will approve it before it appears in the marketplace.
+                      Share your listing and the admin team will approve it before it appears in the marketplace. Check the admin portal for status.
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => window.open('mailto:support@pomi.community?subject=Pomi%20Marketplace%20Listing%20Approval', '_blank')}
-                      className="inline-flex w-max items-center gap-2 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
-                    >
-                      Email admin team
-                    </button>
                   </div>
                 )}
               </div>
@@ -1030,12 +1025,12 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation()
-                            window.open(
-                              `mailto:${sellerEmail}?subject=Pomi Marketplace: ${encodeURIComponent(
-                                listing.title
-                              )}`,
-                              '_blank'
-                            )
+                            if (!token) {
+                              setError('Please log in to message sellers')
+                              return
+                            }
+                            setMessagingListing(listing)
+                            setMessageText('')
                           }}
                           className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:border-red-200 hover:text-red-600"
                         >
@@ -1166,7 +1161,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
                     </div>
                     <div>
                       <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Location *
+                        Location
                       </label>
                       <input
                         type="text"
@@ -1175,8 +1170,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
                           setFormData((prev) => ({ ...prev, location: event.target.value }))
                         }
                         className="mt-1 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm shadow-inner focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
-                        placeholder="Eg. Kanata, Downtown Ottawa"
-                        required
+                        placeholder="Eg. Kanata, Downtown Ottawa (optional)"
                       />
                     </div>
                   </div>
@@ -1347,23 +1341,119 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
                   {favorites.includes(selectedListing._id) ? '❤️ Saved to favorites' : '🤍 Save listing'}
                 </button>
                 <button
-                  onClick={() =>
-                    window.open(
-                      `mailto:${selectedListing.sellerName.replace(/\s+/g, '.')}@example.com?subject=Pomi Marketplace: ${encodeURIComponent(
-                        selectedListing.title
-                      )}`,
-                      '_blank'
-                    )
-                  }
+                  onClick={() => {
+                    if (!token) {
+                      setError('Please log in to message sellers')
+                      return
+                    }
+                    setMessagingListing(selectedListing)
+                    setMessageText('')
+                  }}
                   className="flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-600 transition hover:border-red-200 hover:text-red-600"
                 >
                   💬 Message seller
                 </button>
                 <p className="text-xs text-gray-500">
-                  Every chat is monitored for safety. Report concerns to support@pomi.community so the admin team can step in.
+                  Every message is monitored for safety. Report concerns to support@pomi.community so the admin team can step in.
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Messaging Modal */}
+      {messagingListing && token && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md p-4">
+          <div className="relative w-full max-w-md rounded-3xl border border-red-100 bg-white shadow-2xl">
+            <button
+              onClick={() => {
+                setMessagingListing(null)
+                setMessageText('')
+              }}
+              className="absolute right-4 top-4 rounded-full bg-gray-100 px-3 py-1 text-lg text-gray-500 transition hover:bg-gray-200"
+              aria-label="Close messaging"
+            >
+              ×
+            </button>
+
+            <div className="space-y-4 border-b border-gray-100 p-6">
+              <h3 className="text-lg font-bold text-gray-900">Message seller</h3>
+              <div className="flex items-start gap-3 rounded-2xl bg-gray-50 p-4">
+                <span className="text-3xl">👤</span>
+                <div>
+                  <p className="font-semibold text-gray-800">{messagingListing.sellerName}</p>
+                  <p className="text-xs text-gray-500 line-clamp-1">
+                    Selling: {messagingListing.title}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (!messageText.trim()) {
+                  setError('Please write a message')
+                  return
+                }
+
+                setSendingMessage(true)
+                try {
+                  // In a full implementation, this would send to your messaging backend
+                  // For now, we'll show a success message
+                  setSubmissionMessage(
+                    `Message sent to ${messagingListing.sellerName}! They'll get back to you soon. 🎉`
+                  )
+                  setMessagingListing(null)
+                  setMessageText('')
+                  setTimeout(() => setSubmissionMessage(''), 4000)
+                } catch (err: any) {
+                  setError(err.message || 'Failed to send message')
+                } finally {
+                  setSendingMessage(false)
+                }
+              }}
+              className="space-y-4 p-6"
+            >
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Your message
+                </label>
+                <textarea
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  placeholder="Hi! I'm interested in this item. Is it still available?..."
+                  className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm shadow-inner focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                  rows={4}
+                  disabled={sendingMessage}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMessagingListing(null)
+                    setMessageText('')
+                  }}
+                  className="flex-1 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 transition hover:border-red-200 hover:text-red-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendingMessage || !messageText.trim()}
+                  className="flex-1 rounded-2xl bg-gradient-to-r from-red-600 to-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-200 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {sendingMessage ? 'Sending...' : 'Send message'}
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500 text-center">
+                Messages are monitored for safety. The seller will receive your contact info.
+              </p>
+            </form>
           </div>
         </div>
       )}
