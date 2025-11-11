@@ -94,6 +94,19 @@ class AuthService {
     }
   }
 
+  async adminLogin(data: LoginRequest): Promise<AuthResponse> {
+    try {
+      const response = await this.api.post<AuthResponse>('/auth/admin/login', {
+        email: data.email,
+        password: data.password,
+      });
+      return response.data;
+    } catch (error: any) {
+      const message = error.response?.data?.error || 'Admin login failed';
+      throw new Error(message);
+    }
+  }
+
   async getCurrentUser(): Promise<{ user: User }> {
     try {
       const response = await this.api.get<{ user: User }>('/auth/me');

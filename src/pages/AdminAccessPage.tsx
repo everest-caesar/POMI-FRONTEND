@@ -65,15 +65,13 @@ export default function AdminAccessPage() {
     setLoading(true)
 
     try {
-      const response = await authService.login({
+      const response = await authService.adminLogin({
         email: loginForm.email.trim(),
         password: loginForm.password,
       })
-
       authService.setToken(response.token)
       localStorage.setItem('userData', JSON.stringify(response.user))
       setCurrentUser(response.user)
-
       if (!response.user.isAdmin) {
         setError(
           'Access denied. Only the designated admin credential can open the console. Please contact the community lead if you need assistance.'
