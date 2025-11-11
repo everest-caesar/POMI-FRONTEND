@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@reduxjs/toolkit": "^1.9.7",
+    "@rollup/rollup-linux-x64-gnu": "^4.0.0",
     "axios": "^1.6.2",
     "date-fns": "^2.30.0",
     "i18next": "^23.7.0",
