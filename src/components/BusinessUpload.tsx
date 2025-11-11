@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import axios from 'axios'
+import axiosInstance from '../utils/axios'
 import authService from '../services/authService'
 
 interface BusinessFormData {
@@ -84,16 +84,10 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
 
     try {
       // Create business first
-      const createResponse = await axios.post(
-        '/api/v1/businesses',
+      const createResponse = await axiosInstance.post(
+        '/businesses',
         {
           ...formData,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
         }
       )
 
@@ -131,9 +125,8 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
         uploadFormData.append('images', file)
       })
 
-      await axios.post(`/api/v1/businesses/${id}/images`, uploadFormData, {
+      await axiosInstance.post(`/businesses/${id}/images`, uploadFormData, {
         headers: {
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
         },
       })
@@ -151,15 +144,9 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
 
     setLoading(true)
     try {
-      await axios.put(
-        `/api/v1/businesses/${businessId}`,
-        { status: 'active' },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+      await axiosInstance.put(
+        `/businesses/${businessId}`,
+        { status: 'active' }
       )
 
       setSuccess(`Business published successfully! It's now visible in the directory.`)

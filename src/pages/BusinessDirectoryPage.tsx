@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import axios from 'axios'
+import axiosInstance from '../utils/axios'
 import authService from '../services/authService'
 
 interface Business {
@@ -48,7 +48,7 @@ export default function BusinessDirectoryPage() {
       try {
         setLoading(true)
         setError(null)
-        const response = await axios.get('/api/v1/businesses', {
+        const response = await axiosInstance.get('/businesses', {
           params: {
             status: 'active',
             limit: 100,

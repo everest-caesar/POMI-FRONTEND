@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
-import axios from 'axios'
+import axiosInstance from '../utils/axios'
+import authService from '../services/authService'
 
 interface UploadProgress {
   [key: string]: number
@@ -110,15 +111,12 @@ export default function MarketplaceUpload({
         formData.append('listingId', listingId)
       }
 
-      const token = localStorage.getItem('token')
-
-      const response = await axios.post(
-        '/api/v1/marketplace/upload',
+      const response = await axiosInstance.post(
+        '/marketplace/upload',
         formData,
         {
           headers: {
             'Content-Type': 'multipart/form-data',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           onUploadProgress: (progressEvent) => {
             const percentCompleted = Math.round(
