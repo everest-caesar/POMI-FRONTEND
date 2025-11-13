@@ -209,19 +209,24 @@ export default function Messaging({ currentUserId, currentUserName }) {
         const trimmedMessage = messageInput.trim();
         const listingContextId = resolveListingIdForConversation();
         try {
-            // First save to database via REST API
-            await axiosInstance.post('/messages', {
-                recipientId: selectedConversation.userId,
-                content: trimmedMessage,
-                listingId: listingContextId || undefined,
-            });
-            // Then send via Socket.io for real-time delivery
-            socketService.sendMessage(selectedConversation.userId, trimmedMessage, listingContextId || undefined);
-            // Add message to UI immediately
+            // FIX: Use Socket.io for real-time messaging (backend now handles database persistence)
+            if (socketService.isConnected()) {
+                // Socket.io connected - use real-time delivery with automatic database persistence
+                socketService.sendMessage(selectedConversation.userId, trimmedMessage, listingContextId || undefined);
+            }
+            else {
+                // Fallback to REST API if Socket.io is disconnected
+                await axiosInstance.post('/messages', {
+                    recipientId: selectedConversation.userId,
+                    content: trimmedMessage,
+                    listingId: listingContextId || undefined,
+                });
+            }
+            // Add message to UI immediately (optimistic update)
             setMessages((prev) => [
                 ...prev,
                 {
-                    _id: Math.random().toString(),
+                    _id: Math.random().toString(), // Temporary ID until server confirms
                     senderId: currentUserId,
                     senderName: currentUserName,
                     content: trimmedMessage,

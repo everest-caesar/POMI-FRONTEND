@@ -40,6 +40,7 @@ declare class AuthService {
     constructor();
     register(data: RegisterRequest): Promise<AuthResponse>;
     login(data: LoginRequest): Promise<AuthResponse>;
+    adminLogin(data: LoginRequest): Promise<AuthResponse>;
     getCurrentUser(): Promise<{
         user: User;
     }>;

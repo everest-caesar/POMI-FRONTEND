@@ -210,6 +210,7 @@ function App() {
     }
     return 0
   })
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0)
   const [messageDraft, setMessageDraft] = useState('')
   const [inboxFilter, setInboxFilter] = useState<'updates' | 'sent'>('updates')
   const navigate = useNavigate()
@@ -302,6 +303,38 @@ function App() {
       }
     }
   }, [showAdminInbox, unreadAdminMessages])
+
+  // Fetch unread messages count for regular user-to-user messages
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setUnreadMessagesCount(0)
+      return
+    }
+
+    const fetchUnreadCount = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1'}/messages/unread/count`, {
+          headers: {
+            'Authorization': `Bearer ${authService.getToken()}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setUnreadMessagesCount(data.unreadCount || 0)
+        }
+      } catch (error) {
+        console.error('Failed to fetch unread messages count:', error)
+      }
+    }
+
+    fetchUnreadCount()
+
+    // Refresh count every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000)
+
+    return () => clearInterval(interval)
+  }, [isLoggedIn])
 
   const handleAuthSuccess = (user: AuthUser) => {
     setCurrentUser(user)
@@ -453,10 +486,15 @@ function App() {
             {isLoggedIn ? (
               <button
                 onClick={() => navigate('/messages')}
-                className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white/80 transition hover:border-white/40 hover:text-white"
+                className="relative inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white/80 transition hover:border-white/40 hover:text-white"
                 aria-label="Go to direct messages"
               >
                 ✉️ Messages
+                {unreadMessagesCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white shadow shadow-red-500/40">
+                    {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+                  </span>
+                )}
               </button>
             ) : null}
             {isLoggedIn ? (

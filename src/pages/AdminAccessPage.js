@@ -52,7 +52,7 @@ export default function AdminAccessPage() {
         resetMessages();
         setLoading(true);
         try {
-            const response = await authService.login({
+            const response = await authService.adminLogin({
                 email: loginForm.email.trim(),
                 password: loginForm.password,
             });

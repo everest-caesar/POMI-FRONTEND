@@ -54,6 +54,19 @@ class AuthService {
             throw new Error(message);
         }
     }
+    async adminLogin(data) {
+        try {
+            const response = await this.api.post('/auth/admin/login', {
+                email: data.email,
+                password: data.password,
+            });
+            return response.data;
+        }
+        catch (error) {
+            const message = error.response?.data?.error || 'Admin login failed';
+            throw new Error(message);
+        }
+    }
     async getCurrentUser() {
         try {
             const response = await this.api.get('/auth/me');
