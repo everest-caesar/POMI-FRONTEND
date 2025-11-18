@@ -1,6 +1,16 @@
 import { io } from 'socket.io-client';
 import { API_BASE_URL } from '../config/api';
 import authService from './authService';
+const resolveSocketUrl = () => {
+    const windowSocket = typeof window !== 'undefined' ? window.VITE_SOCKET_URL : undefined;
+    const envSocketUrl = import.meta?.env?.VITE_SOCKET_URL || windowSocket;
+    if (typeof envSocketUrl === 'string' && envSocketUrl.trim()) {
+        return envSocketUrl.replace(/\/$/, '');
+    }
+    const normalized = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+    return normalized.replace(/\/$/, '');
+};
+const SOCKET_URL = resolveSocketUrl();
 class SocketService {
     constructor() {
         Object.defineProperty(this, "socket", {
@@ -39,9 +49,7 @@ class SocketService {
             return;
         }
         this.userId = userId;
-        // Get the base URL and replace /api/v1 with just the domain
-        const socketUrl = API_BASE_URL.replace(/\/api\/v1$/, '');
-        this.socket = io(socketUrl, {
+        this.socket = io(SOCKET_URL, {
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,

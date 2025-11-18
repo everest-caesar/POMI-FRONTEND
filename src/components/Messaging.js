@@ -22,7 +22,7 @@ export default function Messaging({ currentUserId, currentUserName }) {
     const [conversationsLoading, setConversationsLoading] = useState(true);
     const [conversationsError, setConversationsError] = useState('');
     const [activeListing, setActiveListing] = useState(null);
-    const [listingConversationId, setListingConversationId] = useState(null);
+    const [listingContext, setListingContext] = useState(null);
     const [listingLoading, setListingLoading] = useState(false);
     const [listingError, setListingError] = useState('');
     const messagesEndRef = useRef(null);
@@ -47,7 +47,7 @@ export default function Messaging({ currentUserId, currentUserName }) {
         try {
             setListingLoading(true);
             setListingError('');
-            setListingConversationId(conversationId);
+            setListingContext({ conversationId, listingId });
             const response = await axiosInstance.get(`/marketplace/listings/${listingId}`);
             if (activeConversationIdRef.current !== conversationId) {
                 return;
@@ -59,7 +59,7 @@ export default function Messaging({ currentUserId, currentUserName }) {
             if (activeConversationIdRef.current === conversationId) {
                 setListingError('Unable to load listing details right now');
                 setActiveListing(null);
-                setListingConversationId(null);
+                setListingContext(null);
             }
         }
         finally {
@@ -110,11 +110,13 @@ export default function Messaging({ currentUserId, currentUserName }) {
             if (!hasConversation) {
                 fetchConversations();
             }
-            if (isActiveConversation &&
-                data.listingId &&
-                selectedConversation &&
-                listingConversationId !== selectedConversation.userId) {
-                void fetchListingDetails(data.listingId, selectedConversation.userId);
+            if (isActiveConversation && data.listingId && selectedConversation) {
+                const shouldFetchListing = !listingContext ||
+                    listingContext.conversationId !== selectedConversation.userId ||
+                    listingContext.listingId !== data.listingId;
+                if (shouldFetchListing) {
+                    void fetchListingDetails(data.listingId, selectedConversation.userId);
+                }
             }
         };
         const handleTypingStart = (data) => {
@@ -154,7 +156,14 @@ export default function Messaging({ currentUserId, currentUserName }) {
                 clearTimeout(typingTimeoutRef.current);
             }
         };
-    }, [selectedConversation, currentUserId, fetchConversations, fetchListingDetails, listingConversationId]);
+    }, [
+        selectedConversation,
+        currentUserId,
+        fetchConversations,
+        fetchListingDetails,
+        listingContext?.conversationId,
+        listingContext?.listingId,
+    ]);
     // Auto-scroll to bottom when messages change
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -188,7 +197,7 @@ export default function Messaging({ currentUserId, currentUserName }) {
         setMessageInput('');
         setIsTyping(false);
         setActiveListing(null);
-        setListingConversationId(null);
+        setListingContext(null);
         setListingError('');
         setListingLoading(false);
         const fetched = await fetchMessages(conversation.userId);
@@ -285,7 +294,7 @@ export default function Messaging({ currentUserId, currentUserName }) {
                                 ? 'bg-red-50 border-l-4 border-l-red-500'
                                 : 'hover:bg-gray-50'}`, children: _jsxs("div", { className: "flex items-start justify-between gap-2", children: [_jsxs("div", { className: "flex-1 min-w-0", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx("p", { className: "font-semibold text-gray-900 truncate", children: conversation.userName }), _jsx("div", { className: `w-2 h-2 rounded-full ${onlineUsers.has(conversation.userId)
                                                             ? 'bg-emerald-500'
-                                                            : 'bg-gray-300'}` })] }), _jsx("p", { className: "text-xs text-gray-500 line-clamp-1", children: conversation.lastMessage }), conversation.hasListing && (_jsx("p", { className: "text-[11px] font-semibold text-amber-600", children: "Listing inquiry" })), _jsx("p", { className: "text-xs text-gray-400 mt-1", children: new Date(conversation.lastMessageTime).toLocaleDateString() })] }), conversation.unreadCount > 0 && (_jsx("span", { className: "inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white text-xs font-bold", children: conversation.unreadCount }))] }) }, conversation.userId))) })] }), _jsx("div", { className: "flex-1 flex flex-col", children: selectedConversation ? (_jsxs(_Fragment, { children: [_jsx("div", { className: "p-4 border-b border-gray-100 flex items-center justify-between", children: _jsxs("div", { children: [_jsx("h3", { className: "font-bold text-gray-900", children: selectedConversation.userName }), _jsx("p", { className: "text-xs text-gray-500", children: isUserOnline ? (_jsx("span", { className: "text-emerald-600", children: "\u25CF Online" })) : (_jsx("span", { className: "text-gray-400", children: "\u25CF Offline" })) })] }) }), _jsxs("div", { className: "flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50", children: [listingConversationId === selectedConversation.userId && (_jsx(_Fragment, { children: listingLoading ? (_jsx("div", { className: "rounded-2xl border border-white/60 bg-white p-4 text-sm text-gray-500 shadow", children: "Loading listing details..." })) : listingError ? (_jsx("div", { className: "rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-600 shadow", children: listingError })) : activeListing ? (_jsxs("div", { className: "flex items-center gap-4 rounded-2xl border border-white/80 bg-white p-4 shadow", children: [activeListing.images?.length ? (_jsx("img", { src: activeListing.images[0], alt: activeListing.title, className: "h-16 w-16 rounded-xl object-cover" })) : (_jsx("div", { className: "flex h-16 w-16 items-center justify-center rounded-xl bg-gray-100 text-2xl", children: "\uD83D\uDECD\uFE0F" })), _jsxs("div", { className: "flex-1", children: [_jsx("p", { className: "text-sm font-semibold text-gray-900", children: activeListing.title }), _jsx("p", { className: "text-xs text-gray-500", children: activeListing.location || 'Location TBD' }), _jsx("p", { className: "text-sm font-bold text-gray-900", children: formatPrice(activeListing.price) }), activeListing.status && (_jsxs("p", { className: "text-xs text-gray-500 capitalize", children: ["Status: ", activeListing.status.toLowerCase()] }))] })] })) : null })), loading ? (_jsx("div", { className: "flex items-center justify-center h-full", children: _jsx("span", { className: "text-gray-400", children: "Loading messages..." }) })) : messages.length === 0 ? (_jsx("div", { className: "flex items-center justify-center h-full text-center", children: _jsx("span", { className: "text-gray-400", children: "No messages yet. Start the conversation!" }) })) : (messages.map((message) => (_jsx("div", { className: `flex ${message.senderId === currentUserId ? 'justify-end' : 'justify-start'}`, children: _jsxs("div", { className: `max-w-xs px-4 py-2 rounded-2xl ${message.senderId === currentUserId
+                                                            : 'bg-gray-300'}` })] }), _jsx("p", { className: "text-xs text-gray-500 line-clamp-1", children: conversation.lastMessage }), conversation.hasListing && (_jsx("p", { className: "text-[11px] font-semibold text-amber-600", children: "Listing inquiry" })), _jsx("p", { className: "text-xs text-gray-400 mt-1", children: new Date(conversation.lastMessageTime).toLocaleDateString() })] }), conversation.unreadCount > 0 && (_jsx("span", { className: "inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white text-xs font-bold", children: conversation.unreadCount }))] }) }, conversation.userId))) })] }), _jsx("div", { className: "flex-1 flex flex-col", children: selectedConversation ? (_jsxs(_Fragment, { children: [_jsx("div", { className: "p-4 border-b border-gray-100 flex items-center justify-between", children: _jsxs("div", { children: [_jsx("h3", { className: "font-bold text-gray-900", children: selectedConversation.userName }), _jsx("p", { className: "text-xs text-gray-500", children: isUserOnline ? (_jsx("span", { className: "text-emerald-600", children: "\u25CF Online" })) : (_jsx("span", { className: "text-gray-400", children: "\u25CF Offline" })) })] }) }), _jsxs("div", { className: "flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50", children: [listingContext?.conversationId === selectedConversation.userId && (_jsx(_Fragment, { children: listingLoading ? (_jsx("div", { className: "rounded-2xl border border-white/60 bg-white p-4 text-sm text-gray-500 shadow", children: "Loading listing details..." })) : listingError ? (_jsx("div", { className: "rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-600 shadow", children: listingError })) : activeListing ? (_jsxs("div", { className: "flex items-center gap-4 rounded-2xl border border-white/80 bg-white p-4 shadow", children: [activeListing.images?.length ? (_jsx("img", { src: activeListing.images[0], alt: activeListing.title, className: "h-16 w-16 rounded-xl object-cover" })) : (_jsx("div", { className: "flex h-16 w-16 items-center justify-center rounded-xl bg-gray-100 text-2xl", children: "\uD83D\uDECD\uFE0F" })), _jsxs("div", { className: "flex-1", children: [_jsx("p", { className: "text-sm font-semibold text-gray-900", children: activeListing.title }), _jsx("p", { className: "text-xs text-gray-500", children: activeListing.location || 'Location TBD' }), _jsx("p", { className: "text-sm font-bold text-gray-900", children: formatPrice(activeListing.price) }), activeListing.status && (_jsxs("p", { className: "text-xs text-gray-500 capitalize", children: ["Status: ", activeListing.status.toLowerCase()] }))] })] })) : null })), loading ? (_jsx("div", { className: "flex items-center justify-center h-full", children: _jsx("span", { className: "text-gray-400", children: "Loading messages..." }) })) : messages.length === 0 ? (_jsx("div", { className: "flex items-center justify-center h-full text-center", children: _jsx("span", { className: "text-gray-400", children: "No messages yet. Start the conversation!" }) })) : (messages.map((message) => (_jsx("div", { className: `flex ${message.senderId === currentUserId ? 'justify-end' : 'justify-start'}`, children: _jsxs("div", { className: `max-w-xs px-4 py-2 rounded-2xl ${message.senderId === currentUserId
                                             ? 'bg-red-600 text-white'
                                             : 'bg-white border border-gray-200 text-gray-900'}`, children: [_jsx("p", { className: "text-sm break-words", children: message.content }), _jsx("p", { className: `text-xs mt-1 ${message.senderId === currentUserId
                                                     ? 'text-white/70'
