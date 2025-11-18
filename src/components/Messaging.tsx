@@ -56,7 +56,10 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
   const [conversationsLoading, setConversationsLoading] = useState(true);
   const [conversationsError, setConversationsError] = useState('');
   const [activeListing, setActiveListing] = useState<ListingSummary | null>(null);
-  const [listingConversationId, setListingConversationId] = useState<string | null>(null);
+  const [listingContext, setListingContext] = useState<{
+    conversationId: string;
+    listingId: string;
+  } | null>(null);
   const [listingLoading, setListingLoading] = useState(false);
   const [listingError, setListingError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -82,7 +85,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
       try {
         setListingLoading(true);
         setListingError('');
-        setListingConversationId(conversationId);
+        setListingContext({ conversationId, listingId });
         const response = await axiosInstance.get(`/marketplace/listings/${listingId}`);
         if (activeConversationIdRef.current !== conversationId) {
           return;
@@ -93,7 +96,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
         if (activeConversationIdRef.current === conversationId) {
           setListingError('Unable to load listing details right now');
           setActiveListing(null);
-          setListingConversationId(null);
+          setListingContext(null);
         }
       } finally {
         if (activeConversationIdRef.current === conversationId) {
@@ -155,13 +158,14 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
         fetchConversations();
       }
 
-      if (
-        isActiveConversation &&
-        data.listingId &&
-        selectedConversation &&
-        listingConversationId !== selectedConversation.userId
-      ) {
-        void fetchListingDetails(data.listingId, selectedConversation.userId);
+      if (isActiveConversation && data.listingId && selectedConversation) {
+        const shouldFetchListing =
+          !listingContext ||
+          listingContext.conversationId !== selectedConversation.userId ||
+          listingContext.listingId !== data.listingId;
+        if (shouldFetchListing) {
+          void fetchListingDetails(data.listingId, selectedConversation.userId);
+        }
       }
     };
 
@@ -208,7 +212,14 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
         clearTimeout(typingTimeoutRef.current);
       }
     };
-  }, [selectedConversation, currentUserId, fetchConversations, fetchListingDetails, listingConversationId]);
+  }, [
+    selectedConversation,
+    currentUserId,
+    fetchConversations,
+    fetchListingDetails,
+    listingContext?.conversationId,
+    listingContext?.listingId,
+  ]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -243,7 +254,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
     setMessageInput('');
     setIsTyping(false);
     setActiveListing(null);
-    setListingConversationId(null);
+    setListingContext(null);
     setListingError('');
     setListingLoading(false);
 
@@ -460,7 +471,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-              {listingConversationId === selectedConversation.userId && (
+              {listingContext?.conversationId === selectedConversation.userId && (
                 <>
                   {listingLoading ? (
                     <div className="rounded-2xl border border-white/60 bg-white p-4 text-sm text-gray-500 shadow">

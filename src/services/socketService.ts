@@ -2,6 +2,22 @@ import { io, Socket } from 'socket.io-client';
 import { API_BASE_URL } from '../config/api';
 import authService from './authService';
 
+const resolveSocketUrl = (): string => {
+  const windowSocket =
+    typeof window !== 'undefined' ? (window as any).VITE_SOCKET_URL : undefined;
+  const envSocketUrl =
+    ((import.meta as any)?.env?.VITE_SOCKET_URL as string | undefined) || windowSocket;
+
+  if (typeof envSocketUrl === 'string' && envSocketUrl.trim()) {
+    return envSocketUrl.replace(/\/$/, '');
+  }
+
+  const normalized = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+  return normalized.replace(/\/$/, '');
+};
+
+const SOCKET_URL = resolveSocketUrl();
+
 class SocketService {
   private socket: Socket | null = null;
   private userId: string | null = null;
@@ -28,10 +44,7 @@ class SocketService {
     }
     this.userId = userId;
 
-    // Get the base URL and replace /api/v1 with just the domain
-    const socketUrl = API_BASE_URL.replace(/\/api\/v1$/, '');
-
-    this.socket = io(socketUrl, {
+    this.socket = io(SOCKET_URL, {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
