@@ -1,6 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import axiosInstance from '../utils/axios';
 import socketService from '../services/socketService';
+import { generateClientMessageId } from '../utils/messageHelpers';
+
+type MessageStatus = 'sending' | 'sent';
 
 interface Message {
   _id: string;
@@ -10,6 +13,8 @@ interface Message {
   createdAt: string;
   isRead: boolean;
   listingId?: string;
+  clientMessageId?: string | null;
+  status?: MessageStatus;
 }
 
 interface Conversation {
@@ -35,6 +40,12 @@ interface MessagingProps {
   currentUserId: string;
   currentUserName: string;
 }
+
+const normalizeMessages = (items: Message[]): Message[] =>
+  items.map((item) => ({
+    ...item,
+    status: 'sent' as const,
+  }));
 
 const formatPrice = (value?: number) => {
   if (value === null || value === undefined) return '—';
@@ -113,42 +124,59 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
 
     // Listen for incoming messages
     const handleMessageReceive = (data: any) => {
+      const senderId = data?.senderId;
+      const timestamp = data?.timestamp || new Date().toISOString();
       const isActiveConversation =
-        selectedConversation && data.senderId === selectedConversation.userId;
+        Boolean(selectedConversation) && senderId === selectedConversation?.userId;
 
-      // Add received message to current conversation if it's from the selected user
-      if (isActiveConversation) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            _id: Math.random().toString(),
-            senderId: data.senderId,
-            senderName: selectedConversation.userName,
-            content: data.content,
-            createdAt: data.timestamp || new Date().toISOString(),
-            isRead: true,
-          },
-        ]);
+      if (isActiveConversation && senderId && selectedConversation) {
+        const userName = selectedConversation.userName;
+        setMessages((prev) => {
+          const messageId = (data?._id || data?.id || generateClientMessageId()).toString();
+          const clientMessageIdValue = data?.clientMessageId || null;
+          const alreadyExists = prev.some(
+            (msg) =>
+              msg._id === messageId ||
+              (!!clientMessageIdValue && msg.clientMessageId === clientMessageIdValue)
+          );
+          if (alreadyExists) {
+            return prev;
+          }
+
+          return [
+            ...prev,
+            {
+              _id: messageId,
+              clientMessageId: clientMessageIdValue,
+              senderId,
+              senderName: userName,
+              content: data?.content ?? '',
+              createdAt: timestamp,
+              isRead: true,
+              listingId: data?.listingId,
+              status: 'sent',
+            },
+          ];
+        });
       }
 
       let hasConversation = false;
-      // Update conversation last message
       setConversations((prev) => {
-        const exists = prev.some((conv) => conv.userId === data.senderId);
+        const exists = prev.some((conv) => conv.userId === senderId);
         hasConversation = exists;
-        if (!exists) {
+        if (!exists || !senderId) {
           return prev;
         }
 
         return prev.map((conv) =>
-          conv.userId === data.senderId
+          conv.userId === senderId
             ? {
                 ...conv,
-                lastMessage: data.content,
-                lastMessageTime: new Date().toISOString(),
+                lastMessage: data?.content ?? '',
+                lastMessageTime: timestamp,
                 unreadCount: isActiveConversation ? 0 : conv.unreadCount + 1,
-                hasListing: conv.hasListing || Boolean(data.listingId),
-                lastListingId: data.listingId || conv.lastListingId,
+                hasListing: conv.hasListing || Boolean(data?.listingId),
+                lastListingId: data?.listingId || conv.lastListingId,
               }
             : conv
         );
@@ -158,7 +186,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
         fetchConversations();
       }
 
-      if (isActiveConversation && data.listingId && selectedConversation) {
+      if (isActiveConversation && data?.listingId && selectedConversation) {
         const shouldFetchListing =
           !listingContext ||
           listingContext.conversationId !== selectedConversation.userId ||
@@ -182,10 +210,12 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
     };
 
     const handleUserOnline = (data: any) => {
+      if (!data?.userId) return;
       setOnlineUsers((prev) => new Set([...prev, data.userId]));
     };
 
     const handleUserOffline = (data: any) => {
+      if (!data?.userId) return;
       setOnlineUsers((prev) => {
         const newSet = new Set(prev);
         newSet.delete(data.userId);
@@ -193,21 +223,55 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
       });
     };
 
+    const handleUserPresence = (data: any) => {
+      if (!data || !Array.isArray(data.userIds)) {
+        return;
+      }
+      setOnlineUsers(new Set(data.userIds));
+    };
+
+    const handleMessageSent = (data: any) => {
+      if (!data?.clientMessageId) {
+        return;
+      }
+
+      if (!selectedConversation || data.recipientId !== selectedConversation.userId) {
+        return;
+      }
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.clientMessageId === data.clientMessageId
+            ? {
+                ...msg,
+                _id: (data?._id || msg._id)?.toString(),
+                createdAt: data?.timestamp || msg.createdAt,
+                status: 'sent',
+              }
+            : msg
+        )
+      );
+    };
+
     socketService.on('message:receive', handleMessageReceive);
+    socketService.on('message:sent', handleMessageSent);
     socketService.on('typing:start', handleTypingStart);
     socketService.on('typing:stop', handleTypingStop);
     socketService.on('user:online', handleUserOnline);
     socketService.on('user:offline', handleUserOffline);
+    socketService.on('user:presence', handleUserPresence);
 
     // Fetch conversations on mount
     fetchConversations();
 
     return () => {
       socketService.off('message:receive', handleMessageReceive);
+      socketService.off('message:sent', handleMessageSent);
       socketService.off('typing:start', handleTypingStart);
       socketService.off('typing:stop', handleTypingStop);
       socketService.off('user:online', handleUserOnline);
       socketService.off('user:offline', handleUserOffline);
+      socketService.off('user:presence', handleUserPresence);
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
@@ -230,9 +294,10 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
     try {
       setLoading(true);
       const response = await axiosInstance.get(`/messages/${recipientId}`);
-      setMessages(response.data.data);
+      const normalized = normalizeMessages(response.data.data as Message[]);
+      setMessages(normalized);
       setError('');
-      return response.data.data as Message[];
+      return normalized;
     } catch (err: any) {
       console.error('Failed to fetch messages:', err);
       setError('Failed to load messages');
@@ -284,7 +349,23 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
     }
 
     const trimmedMessage = messageInput.trim();
+    setError('');
     const listingContextId = resolveListingIdForConversation();
+    const clientMessageId = generateClientMessageId();
+    const optimisticTimestamp = new Date().toISOString();
+    const optimisticMessage: Message = {
+      _id: clientMessageId,
+      clientMessageId,
+      senderId: currentUserId,
+      senderName: currentUserName,
+      content: trimmedMessage,
+      createdAt: optimisticTimestamp,
+      isRead: true,
+      listingId: listingContextId || undefined,
+      status: socketService.isConnected() ? 'sending' : 'sent',
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
 
     try {
       // FIX: Use Socket.io for real-time messaging (backend now handles database persistence)
@@ -293,33 +374,37 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
         socketService.sendMessage(
           selectedConversation.userId,
           trimmedMessage,
-          listingContextId || undefined
+          listingContextId || undefined,
+          clientMessageId
         );
       } else {
         // Fallback to REST API if Socket.io is disconnected
-        await axiosInstance.post('/messages', {
+        const response = await axiosInstance.post('/messages', {
           recipientId: selectedConversation.userId,
           content: trimmedMessage,
           listingId: listingContextId || undefined,
+          clientMessageId,
         });
+
+        const persisted = response.data?.data as Message;
+        if (persisted?._id) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.clientMessageId === clientMessageId
+                ? {
+                    ...msg,
+                    _id: persisted._id,
+                    createdAt: persisted.createdAt,
+                    isRead: persisted.isRead,
+                    status: 'sent',
+                  }
+                : msg
+            )
+          );
+        }
       }
 
-      // Add message to UI immediately (optimistic update)
-      setMessages((prev) => [
-        ...prev,
-        {
-          _id: Math.random().toString(), // Temporary ID until server confirms
-          senderId: currentUserId,
-          senderName: currentUserName,
-          content: trimmedMessage,
-          createdAt: new Date().toISOString(),
-          isRead: false,
-          listingId: listingContextId || undefined,
-        },
-      ]);
-
       setMessageInput('');
-      socketService.stopTyping(selectedConversation.userId);
 
       // Update conversation
       setConversations((prev) =>
@@ -328,7 +413,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
             ? {
                 ...conv,
                 lastMessage: trimmedMessage,
-                lastMessageTime: new Date().toISOString(),
+                lastMessageTime: optimisticTimestamp,
                 hasListing: conv.hasListing || Boolean(listingContextId),
                 lastListingId: listingContextId || conv.lastListingId,
               }
@@ -338,6 +423,11 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
     } catch (err: any) {
       console.error('Failed to send message:', err);
       setError('Failed to send message');
+      setMessages((prev) => prev.filter((msg) => msg.clientMessageId !== clientMessageId));
+    } finally {
+      if (selectedConversation) {
+        socketService.stopTyping(selectedConversation.userId);
+      }
     }
   };
 
@@ -392,7 +482,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
   }
 
   return (
-    <div className="flex gap-6 h-[600px] bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+    <div className="flex gap-6 h-[520px] lg:h-[600px] bg-white rounded-3xl border border-gray-100 shadow-xl">
       {/* Conversations List */}
       <div className="w-80 border-r border-gray-100 flex flex-col">
         <div className="p-4 border-b border-gray-100">
@@ -533,7 +623,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
                     <div
                       className={`max-w-xs px-4 py-2 rounded-2xl ${
                         message.senderId === currentUserId
-                          ? 'bg-red-600 text-white'
+                          ? 'bg-rose-50 border border-rose-100 text-gray-900 shadow-sm'
                           : 'bg-white border border-gray-200 text-gray-900'
                       }`}
                     >
@@ -541,7 +631,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
                       <p
                         className={`text-xs mt-1 ${
                           message.senderId === currentUserId
-                            ? 'text-white/70'
+                            ? 'text-gray-500'
                             : 'text-gray-400'
                         }`}
                       >
@@ -550,6 +640,11 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
                           minute: '2-digit',
                         })}
                       </p>
+                      {message.senderId === currentUserId && message.status === 'sending' && (
+                        <p className="text-[11px] font-semibold text-amber-600 text-right mt-0.5">
+                          Sending...
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))

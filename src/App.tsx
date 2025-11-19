@@ -11,7 +11,6 @@ type FeatureId =
   | 'marketplace'
   | 'business'
   | 'forums'
-  | 'community'
 
 interface FeatureCard {
   id: FeatureId
@@ -67,15 +66,6 @@ const BASE_FEATURES: FeatureCard[] = [
     gradient: 'bg-gradient-to-br from-emerald-400 via-teal-500 to-green-500',
     borderColor: 'border-emerald-200',
   },
-  {
-    id: 'community',
-    icon: '👥',
-    title: 'Religious Community Circle',
-    description:
-      'Connect faith communities across Ottawa, share announcements, and coordinate cultural celebrations together.',
-    gradient: 'bg-gradient-to-br from-fuchsia-500 via-purple-500 to-pink-500',
-    borderColor: 'border-fuchsia-200',
-  },
 ]
 
 const HERO_STATS = [
@@ -108,12 +98,6 @@ const COMMUNITY_HIGHLIGHTS = [
     blurb:
       'Threaded discussions with upvotes, saved posts, and moderation capture community wisdom for the long term.',
     icon: '💬',
-  },
-  {
-    title: 'Religious community circle',
-    blurb:
-      'Faith groups coordinate celebrations, charity drives, and announcements in one shared digital home.',
-    icon: '🙏',
   },
 ]
 
@@ -608,7 +592,7 @@ function App() {
         </section>
 
         {/* Feature Carousel */}
-        <section className="px-6 py-20" id="experiences">
+        <section className="px-6 py-20 scroll-mt-28" id="experiences">
           <div className="mx-auto max-w-7xl space-y-12">
             <div className="grid gap-6 lg:grid-cols-[1.2fr,1fr] lg:items-end">
               <div>
@@ -642,7 +626,7 @@ function App() {
         </section>
 
         {/* Community Pillars */}
-        <section className="px-6 pb-16">
+        <section className="px-6 pb-16 scroll-mt-28" id="pillars">
           <div className="mx-auto max-w-6xl grid gap-10 rounded-[32px] border border-white/10 bg-white/5 p-10 shadow-[0_40px_80px_rgba(15,23,42,0.45)] backdrop-blur-xl lg:grid-cols-[1.1fr,1.2fr]">
             <div className="space-y-6">
               <div className="space-y-3">
@@ -684,7 +668,7 @@ function App() {
         </section>
 
         {/* Testimonials */}
-        <section className="px-6 pb-16" id="testimonials">
+        <section className="px-6 pb-16 scroll-mt-28" id="testimonials">
           <div className="mx-auto max-w-6xl space-y-10">
             <div className="space-y-3 text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-200">
@@ -719,7 +703,7 @@ function App() {
         </section>
 
         {/* Call to action */}
-        <section className="px-6 pb-24" id="join">
+        <section className="px-6 pb-24 scroll-mt-28" id="join">
           <div className="mx-auto max-w-6xl rounded-[40px] border border-white/10 bg-gradient-to-r from-orange-400 via-red-500 to-rose-500 p-10 shadow-[0_30px_60px_rgba(255,87,51,0.4)]">
             <div className="grid gap-10 lg:grid-cols-[1.4fr,1fr] lg:items-center">
               <div className="space-y-4">
@@ -751,7 +735,7 @@ function App() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => handleExploreFeature('community')}
+                    onClick={() => handleExploreFeature('events')}
                     className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-rose-600 shadow-lg shadow-white/40 transition hover:-translate-y-0.5 hover:bg-rose-50"
                   >
                     Dive back into Pomi
@@ -801,11 +785,6 @@ function App() {
               <li>
                 <button onClick={() => handleExploreFeature('forums')} className="hover:text-white">
                   Forums
-                </button>
-              </li>
-              <li>
-                <button onClick={() => handleExploreFeature('community')} className="hover:text-white">
-                  Religious community circle
                 </button>
               </li>
             </ul>
@@ -886,14 +865,6 @@ function App() {
                 >
                   Start a conversation
                 </button>
-              </div>
-            )}
-            {activeFeature === 'community' && (
-              <div className="space-y-6 text-white/80">
-                <h2 className="text-3xl font-black text-white">Community Circles</h2>
-                <p>
-                  Interest-based groups built for professionals, students, parents, creatives, and more. Host meetups, share resources, and celebrate milestones together.
-                </p>
               </div>
             )}
           </div>

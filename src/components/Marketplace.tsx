@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { API_BASE_URL } from '../config/api'
+import authService from '../services/authService'
+import socketService from '../services/socketService'
+import { generateClientMessageId } from '../utils/messageHelpers'
 
 type CategoryId =
   | 'all'
@@ -289,6 +292,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([])
   const [submissionMessage, setSubmissionMessage] = useState('')
+  const [messageConfirmation, setMessageConfirmation] = useState('')
   const [messagingListing, setMessagingListing] = useState<Listing | null>(null)
   const [messageText, setMessageText] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
@@ -300,6 +304,16 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
     location: '',
     condition: 'good',
   })
+  const currentUser = authService.getUserData()
+  const currentUserId =
+    (currentUser as any)?._id || (currentUser as any)?.id || (currentUser as any)?.userId || ''
+
+  useEffect(() => {
+    if (!token || !currentUserId) {
+      return
+    }
+    socketService.connect(currentUserId)
+  }, [token, currentUserId])
 
   const fetchListings = useCallback(async () => {
     try {
@@ -772,6 +786,25 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
         {/* Filter Sidebar */}
         <aside className="lg:w-80">
           <div className="sticky top-4 space-y-8 rounded-3xl border border-gray-100 bg-white/90 p-6 shadow-xl shadow-red-50/50 backdrop-blur">
+            <div className="rounded-3xl border border-rose-100 bg-rose-50/80 p-4 shadow-inner shadow-rose-100/60">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-rose-800">Favorites spotlight</p>
+                  <p className="text-xs text-rose-600">Jump back to saved listings instantly.</p>
+                </div>
+                <button
+                  onClick={() => setShowFavoritesOnly((prev) => !prev)}
+                  className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                    showFavoritesOnly
+                      ? 'bg-rose-600 text-white shadow-lg shadow-rose-200'
+                      : 'border border-rose-200 bg-white text-rose-600 hover:bg-rose-50'
+                  }`}
+                >
+                  {showFavoritesOnly ? '❤️ On' : '🤍 Off'}
+                </button>
+              </div>
+            </div>
+
             <div>
               <h3 className="text-lg font-bold text-gray-900">Browse by category</h3>
               <p className="text-sm text-gray-500">
@@ -826,18 +859,6 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
 
             <div className="space-y-4">
               <h3 className="text-lg font-bold text-gray-900">Quick filters</h3>
-              <button
-                onClick={() => setShowFavoritesOnly((prev) => !prev)}
-                className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                  showFavoritesOnly
-                    ? 'border-red-200 bg-red-50 text-red-600'
-                    : 'border-gray-200 bg-white text-gray-600 hover:border-red-200 hover:bg-red-50/40'
-                }`}
-              >
-                <span>Show favorites only</span>
-                <span>{showFavoritesOnly ? '❤️' : '🤍'}</span>
-              </button>
-
               <div className="space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                   Price range
@@ -1031,6 +1052,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
                             }
                             setMessagingListing(listing)
                             setMessageText('')
+                            setMessageConfirmation('')
                           }}
                           className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:border-red-200 hover:text-red-600"
                         >
@@ -1348,6 +1370,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
                     }
                     setMessagingListing(selectedListing)
                     setMessageText('')
+                    setMessageConfirmation('')
                   }}
                   className="flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-600 transition hover:border-red-200 hover:text-red-600"
                 >
@@ -1370,6 +1393,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
               onClick={() => {
                 setMessagingListing(null)
                 setMessageText('')
+                setMessageConfirmation('')
               }}
               className="absolute right-4 top-4 rounded-full bg-gray-100 px-3 py-1 text-lg text-gray-500 transition hover:bg-gray-200"
               aria-label="Close messaging"
@@ -1399,6 +1423,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
                 }
 
                 setSendingMessage(true)
+                setError('')
                 try {
                   // Get seller ID from marketplace listing
                   const listingResponse = await fetch(`${API_BASE_URL}/marketplace/listings/${messagingListing._id}`, {
@@ -1407,30 +1432,42 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
                   const listingData = await listingResponse.json()
                   const sellerId = (listingData.data.sellerId as any)?._id || (listingData.data.sellerId as any)?.id
 
-                  // Send message via REST API
-                  const messageResponse = await fetch(`${API_BASE_URL}/messages`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                      recipientId: sellerId,
-                      content: messageText.trim(),
-                      listingId: messagingListing._id,
-                    }),
-                  })
-
-                  if (!messageResponse.ok) {
-                    throw new Error('Failed to send message')
+                  if (!sellerId) {
+                    throw new Error('Unable to contact the seller right now')
                   }
 
-                  setSubmissionMessage(
+                  const trimmed = messageText.trim()
+                  const clientMessageId = generateClientMessageId()
+                  const canUseSocket = Boolean(currentUserId && socketService.isConnected())
+
+                  if (canUseSocket) {
+                    socketService.sendMessage(sellerId, trimmed, messagingListing._id, clientMessageId)
+                  } else {
+                    // Send message via REST API
+                    const messageResponse = await fetch(`${API_BASE_URL}/messages`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({
+                        recipientId: sellerId,
+                        content: trimmed,
+                        listingId: messagingListing._id,
+                        clientMessageId,
+                      }),
+                    })
+
+                    if (!messageResponse.ok) {
+                      throw new Error('Failed to send message')
+                    }
+                  }
+
+                  setMessageConfirmation(
                     `Message sent to ${messagingListing.sellerName}! They'll get back to you soon. 🎉`
                   )
-                  setMessagingListing(null)
                   setMessageText('')
-                  setTimeout(() => setSubmissionMessage(''), 4000)
+                  setTimeout(() => setMessageConfirmation(''), 4000)
                 } catch (err: any) {
                   setError(err.message || 'Failed to send message')
                 } finally {
@@ -1439,6 +1476,12 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
               }}
               className="space-y-4 p-6"
             >
+              {messageConfirmation && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm">
+                  {messageConfirmation}
+                </div>
+              )}
+
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                   Your message
@@ -1459,6 +1502,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
                   onClick={() => {
                     setMessagingListing(null)
                     setMessageText('')
+                    setMessageConfirmation('')
                   }}
                   className="flex-1 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 transition hover:border-red-200 hover:text-red-600"
                 >

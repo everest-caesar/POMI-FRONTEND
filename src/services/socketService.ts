@@ -83,6 +83,11 @@ class SocketService {
       this.emit('typing:stop', data);
     });
 
+    // Delivery confirmation
+    this.socket.on('message:sent', (data: any) => {
+      this.emit('message:sent', data);
+    });
+
     // Handle user online/offline status
     this.socket.on('user:online', (data: any) => {
       this.emit('user:online', data);
@@ -90,6 +95,10 @@ class SocketService {
 
     this.socket.on('user:offline', (data: any) => {
       this.emit('user:offline', data);
+    });
+
+    this.socket.on('user:presence', (data: any) => {
+      this.emit('user:presence', data);
     });
 
     // Handle connection errors
@@ -118,7 +127,7 @@ class SocketService {
   /**
    * Send a message via Socket.io
    */
-  sendMessage(recipientId: string, content: string, listingId?: string): void {
+  sendMessage(recipientId: string, content: string, listingId?: string, clientMessageId?: string): void {
     if (!this.socket || !this.socket.connected) {
       console.error('Socket not connected');
       return;
@@ -128,6 +137,7 @@ class SocketService {
       recipientId,
       content,
       listingId,
+      clientMessageId,
     });
   }
 
