@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import BusinessUpload from './BusinessUpload'
 import EventCreationForm from './EventCreationForm'
 import { API_BASE_URL } from '../config/api'
@@ -106,6 +106,56 @@ interface CommunityMember {
   joinedAt: string
 }
 
+interface AdminMessage {
+  id: string
+  recipientId?: string | null
+  recipientName?: string | null
+  content: string
+  createdAt: string
+}
+
+type SectionErrors = {
+  overview: string | null
+  events: string | null
+  businesses: string | null
+  listings: string | null
+  users: string | null
+  messages: string | null
+}
+
+const createEmptySectionErrors = (): SectionErrors => ({
+  overview: null,
+  events: null,
+  businesses: null,
+  listings: null,
+  users: null,
+  messages: null,
+})
+
+const getErrorMessage = (reason: unknown): string => {
+  if (reason instanceof Error) return reason.message
+  if (typeof reason === 'string') return reason
+  if (reason && typeof reason === 'object' && 'message' in reason) {
+    return String((reason as any).message)
+  }
+  return 'Unable to load this section. Please try again.'
+}
+
+const generateLocalId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+const mapAdminMessages = (rawMessages: any[]): AdminMessage[] =>
+  rawMessages.map((message) => ({
+    id: message?._id?.toString?.() || message?.id || generateLocalId(),
+    recipientId:
+      message?.recipientId?.toString?.() || message?.recipientId || null,
+    recipientName: message?.recipientName || 'Community member',
+    content: message?.content || '',
+    createdAt: message?.createdAt || new Date().toISOString(),
+  }))
+
 const STATUS_OPTIONS: Array<AdminBusiness['status']> = [
   'draft',
   'active',
@@ -139,8 +189,12 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
   const [listings, setListings] = useState<AdminListing[]>([])
   const [businesses, setBusinesses] = useState<AdminBusiness[]>([])
   const [members, setMembers] = useState<CommunityMember[]>([])
+  const [adminMessages, setAdminMessages] = useState<AdminMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [sectionErrors, setSectionErrors] = useState<SectionErrors>(
+    createEmptySectionErrors(),
+  )
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [updatingBusinessId, setUpdatingBusinessId] = useState<string | null>(
     null,
@@ -149,6 +203,35 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
   const [moderatingListingId, setModeratingListingId] = useState<string | null>(null)
   const [showBusinessUpload, setShowBusinessUpload] = useState(false)
   const [showEventCreation, setShowEventCreation] = useState(false)
+  const [showPendingEventsOnly, setShowPendingEventsOnly] = useState(true)
+  const [showPendingListingsOnly, setShowPendingListingsOnly] = useState(true)
+  const [memberQuery, setMemberQuery] = useState('')
+  const [memberSearchApplied, setMemberSearchApplied] = useState(false)
+  const [membersTotal, setMembersTotal] = useState<number | null>(null)
+  const [isSearchingMembers, setIsSearchingMembers] = useState(false)
+  const [messageForm, setMessageForm] = useState({ recipientId: '', content: '' })
+  const [broadcastContent, setBroadcastContent] = useState('')
+  const [messagingFeedback, setMessagingFeedback] = useState<{
+    type: 'success' | 'error'
+    message: string
+  } | null>(null)
+  const [messagingLoading, setMessagingLoading] = useState(false)
+
+  const filteredEvents = useMemo(
+    () =>
+      showPendingEventsOnly
+        ? events.filter((event) => event.moderationStatus === 'pending')
+        : events,
+    [events, showPendingEventsOnly],
+  )
+
+  const filteredListings = useMemo(
+    () =>
+      showPendingListingsOnly
+        ? listings.filter((listing) => listing.moderationStatus === 'pending')
+        : listings,
+    [listings, showPendingListingsOnly],
+  )
 
   const fetchJson = async (
     path: string,
@@ -170,28 +253,210 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
     return data
   }
 
+  const fetchAdminUsersData = (searchTerm?: string) => {
+    const query = searchTerm ? `?search=${encodeURIComponent(searchTerm)}` : ''
+    return fetchJson(`/admin/users${query}`)
+  }
+
+  const fetchAdminMessagesData = () => fetchJson('/admin/messages')
+
   const loadAdminData = async () => {
     setLoading(true)
     setError(null)
     setStatusMessage(null)
+    const nextErrors = createEmptySectionErrors()
     try {
-      const [overviewData, eventsData, businessesData, listingsData, usersData] = await Promise.all([
+      const [
+        overviewResult,
+        eventsResult,
+        businessesResult,
+        listingsResult,
+        usersResult,
+        messagesResult,
+      ] = await Promise.allSettled<any>([
         fetchJson('/admin/overview'),
         fetchJson('/admin/events'),
         fetchJson('/admin/businesses'),
         fetchJson('/admin/marketplace'),
-        fetchJson('/admin/users'),
+        fetchAdminUsersData(),
+        fetchAdminMessagesData(),
       ])
 
-      setMetrics(overviewData.metrics)
-      setEvents(eventsData.events || [])
-      setBusinesses(businessesData.businesses || [])
-      setListings(listingsData.listings || [])
-      setMembers(usersData.users || [])
-    } catch (err: any) {
-      setError(err.message || 'Failed to load admin data')
+      if (overviewResult.status === 'fulfilled') {
+        setMetrics(overviewResult.value.metrics)
+      } else {
+        setMetrics(null)
+        nextErrors.overview = getErrorMessage(overviewResult.reason)
+      }
+
+      if (eventsResult.status === 'fulfilled') {
+        setEvents(eventsResult.value.events || [])
+      } else {
+        setEvents([])
+        nextErrors.events = getErrorMessage(eventsResult.reason)
+      }
+
+      if (businessesResult.status === 'fulfilled') {
+        setBusinesses(businessesResult.value.businesses || [])
+      } else {
+        setBusinesses([])
+        nextErrors.businesses = getErrorMessage(businessesResult.reason)
+      }
+
+      if (listingsResult.status === 'fulfilled') {
+        setListings(listingsResult.value.listings || [])
+      } else {
+        setListings([])
+        nextErrors.listings = getErrorMessage(listingsResult.reason)
+      }
+
+      if (usersResult.status === 'fulfilled') {
+        setMembers(usersResult.value.users || [])
+        setMembersTotal(
+          usersResult.value.pagination?.total ??
+            usersResult.value.users?.length ??
+            null,
+        )
+        setMemberSearchApplied(false)
+      } else {
+        setMembers([])
+        setMembersTotal(null)
+        nextErrors.users = getErrorMessage(usersResult.reason)
+      }
+
+      if (messagesResult.status === 'fulfilled') {
+        setAdminMessages(mapAdminMessages(messagesResult.value.data || []))
+      } else {
+        setAdminMessages([])
+        nextErrors.messages = getErrorMessage(messagesResult.reason)
+      }
+
+      const fatal = Object.values(nextErrors).every((msg) => Boolean(msg))
+      setError(
+        fatal ? 'Failed to load admin data. Please try again.' : null,
+      )
     } finally {
+      setSectionErrors(nextErrors)
       setLoading(false)
+    }
+  }
+
+  const refreshMembers = async (searchTerm?: string) => {
+    const term = searchTerm?.trim()
+    setIsSearchingMembers(true)
+    setSectionErrors((prev) => ({ ...prev, users: null }))
+    try {
+      const response = await fetchAdminUsersData(term)
+      setMembers(response.users || [])
+      setMembersTotal(
+        response.pagination?.total ?? response.users?.length ?? null,
+      )
+      setMemberSearchApplied(Boolean(term))
+    } catch (err: any) {
+      setSectionErrors((prev) => ({
+        ...prev,
+        users: err.message || 'Failed to load community members',
+      }))
+    } finally {
+      setIsSearchingMembers(false)
+    }
+  }
+
+  const handleMemberSearch = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    await refreshMembers(memberQuery)
+  }
+
+  const handleClearMemberSearch = async () => {
+    setMemberQuery('')
+    await refreshMembers()
+  }
+
+  const refreshAdminMessagesList = async () => {
+    try {
+      const response = await fetchAdminMessagesData()
+      setAdminMessages(mapAdminMessages(response.data || []))
+      setSectionErrors((prev) => ({ ...prev, messages: null }))
+    } catch (err: any) {
+      setSectionErrors((prev) => ({
+        ...prev,
+        messages: err.message || 'Failed to load admin messages',
+      }))
+    }
+  }
+
+  const handleTargetedMessageSubmit = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault()
+    if (!messageForm.recipientId || !messageForm.content.trim()) {
+      setMessagingFeedback({
+        type: 'error',
+        message: 'Select a recipient and write a message before sending.',
+      })
+      return
+    }
+
+    setMessagingLoading(true)
+    setMessagingFeedback(null)
+    try {
+      await fetchJson('/admin/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          recipientId: messageForm.recipientId,
+          content: messageForm.content.trim(),
+        }),
+      })
+      setMessagingFeedback({
+        type: 'success',
+        message: 'Message sent to the member.',
+      })
+      setMessageForm({ recipientId: '', content: '' })
+      await refreshAdminMessagesList()
+    } catch (err: any) {
+      setMessagingFeedback({
+        type: 'error',
+        message: err.message || 'Failed to send the message',
+      })
+    } finally {
+      setMessagingLoading(false)
+    }
+  }
+
+  const handleBroadcastMessageSubmit = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault()
+    if (!broadcastContent.trim()) {
+      setMessagingFeedback({
+        type: 'error',
+        message: 'Write a message before broadcasting to the community.',
+      })
+      return
+    }
+
+    setMessagingLoading(true)
+    setMessagingFeedback(null)
+    try {
+      await fetchJson('/admin/messages/broadcast', {
+        method: 'POST',
+        body: JSON.stringify({
+          content: broadcastContent.trim(),
+        }),
+      })
+      setMessagingFeedback({
+        type: 'success',
+        message: 'Broadcast queued for all community members.',
+      })
+      setBroadcastContent('')
+      await refreshAdminMessagesList()
+    } catch (err: any) {
+      setMessagingFeedback({
+        type: 'error',
+        message: err.message || 'Failed to broadcast the message',
+      })
+    } finally {
+      setMessagingLoading(false)
     }
   }
 
@@ -413,51 +678,57 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                 </div>
               )}
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7">
-                <SummaryCard
-                  title="Community Members"
-                  value={metrics?.totalUsers ?? 0}
-                  icon="👥"
-                  accent="from-red-500 to-orange-500"
-                />
-                <SummaryCard
-                  title="Active Events"
-                  value={metrics?.totalEvents ?? 0}
-                  icon="🎉"
-                  accent="from-orange-500 to-amber-500"
-                />
-                <SummaryCard
-                  title="Business Listings"
-                  value={metrics?.totalBusinesses ?? 0}
-                  icon="🏢"
-                  accent="from-amber-500 to-yellow-500"
-                />
-                <SummaryCard
-                  title="Total RSVPs"
-                  value={metrics?.totalRegistrations ?? 0}
-                  icon="📝"
-                  accent="from-emerald-500 to-teal-500"
-                />
-                <SummaryCard
-                  title="Pending Businesses"
-                  value={metrics?.pendingBusinesses ?? 0}
-                  icon="⏳"
-                  accent="from-blue-500 to-indigo-500"
-                />
-                <SummaryCard
-                  title="Pending Events"
-                  value={metrics?.pendingEvents ?? 0}
-                  icon="🕒"
-                  accent="from-purple-500 to-violet-500"
-                />
-                <SummaryCard
-                  title="Pending Listings"
-                  value={metrics?.pendingListings ?? 0}
-                  icon="🛒"
-                  accent="from-fuchsia-500 to-pink-500"
-                />
+              {sectionErrors.overview ? (
+                <div className="rounded-3xl border border-rose-300/40 bg-rose-500/10 px-6 py-4 text-sm text-rose-100">
+                  {sectionErrors.overview}
                 </div>
-              </section>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7">
+                  <SummaryCard
+                    title="Community Members"
+                    value={metrics?.totalUsers ?? 0}
+                    icon="👥"
+                    accent="from-red-500 to-orange-500"
+                  />
+                  <SummaryCard
+                    title="Active Events"
+                    value={metrics?.totalEvents ?? 0}
+                    icon="🎉"
+                    accent="from-orange-500 to-amber-500"
+                  />
+                  <SummaryCard
+                    title="Business Listings"
+                    value={metrics?.totalBusinesses ?? 0}
+                    icon="🏢"
+                    accent="from-amber-500 to-yellow-500"
+                  />
+                  <SummaryCard
+                    title="Total RSVPs"
+                    value={metrics?.totalRegistrations ?? 0}
+                    icon="📝"
+                    accent="from-emerald-500 to-teal-500"
+                  />
+                  <SummaryCard
+                    title="Pending Businesses"
+                    value={metrics?.pendingBusinesses ?? 0}
+                    icon="⏳"
+                    accent="from-blue-500 to-indigo-500"
+                  />
+                  <SummaryCard
+                    title="Pending Events"
+                    value={metrics?.pendingEvents ?? 0}
+                    icon="🕒"
+                    accent="from-purple-500 to-violet-500"
+                  />
+                  <SummaryCard
+                    title="Pending Listings"
+                    value={metrics?.pendingListings ?? 0}
+                    icon="🛒"
+                    accent="from-fuchsia-500 to-pink-500"
+                  />
+                </div>
+              )}
+            </section>
 
               {/* Marketplace Moderation */}
               <section className="space-y-4">
@@ -470,18 +741,39 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                       Approve community submissions before they appear in the marketplace feed.
                     </p>
                   </div>
-                  <span className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-white/70">
-                    {listings.length} submissions
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-white/70">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-white/30 bg-transparent text-rose-400 focus:ring-rose-400"
+                        checked={showPendingListingsOnly}
+                        onChange={() =>
+                          setShowPendingListingsOnly((prev) => !prev)
+                        }
+                      />
+                      Pending only
+                    </label>
+                    <span className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-white/70">
+                      {showPendingListingsOnly
+                        ? `${filteredListings.length} pending`
+                        : `${listings.length} submissions`}
+                    </span>
+                  </div>
                 </div>
 
-                {listings.length === 0 ? (
+                {sectionErrors.listings ? (
+                  <div className="rounded-3xl border border-rose-300/40 bg-rose-500/10 px-6 py-4 text-sm text-rose-100">
+                    {sectionErrors.listings}
+                  </div>
+                ) : filteredListings.length === 0 ? (
                   <div className="rounded-3xl border border-white/10 bg-white/5 px-6 py-10 text-center text-white/70 shadow-lg shadow-slate-900/30 backdrop-blur">
-                    No marketplace submissions yet. Encourage members to share their listings.
+                    {showPendingListingsOnly && listings.length > 0
+                      ? 'No pending marketplace submissions. Toggle the filter to review approved or rejected posts.'
+                      : 'No marketplace submissions yet. Encourage members to share their listings.'}
                   </div>
                 ) : (
                   <div className="grid gap-4">
-                    {listings.map((listing) => {
+                    {filteredListings.map((listing) => {
                       const status = listing.moderationStatus || 'approved'
                       const isPending = status === 'pending'
                       const isRejected = status === 'rejected'
@@ -595,8 +887,21 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                     >
                       {showEventCreation ? '✕ Cancel' : '+ Create Event'}
                     </button>
+                    <label className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-white/70">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-white/30 bg-transparent text-rose-400 focus:ring-rose-400"
+                        checked={showPendingEventsOnly}
+                        onChange={() =>
+                          setShowPendingEventsOnly((prev) => !prev)
+                        }
+                      />
+                      Pending only
+                    </label>
                     <span className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-white/70">
-                      {events.length} tracked
+                      {showPendingEventsOnly
+                        ? `${filteredEvents.length} pending`
+                        : `${events.length} tracked`}
                     </span>
                   </div>
                 </div>
@@ -613,13 +918,19 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                   </div>
                 )}
 
-                {events.length === 0 ? (
+                {sectionErrors.events ? (
+                  <div className="rounded-3xl border border-rose-300/40 bg-rose-500/10 px-6 py-4 text-sm text-rose-100">
+                    {sectionErrors.events}
+                  </div>
+                ) : filteredEvents.length === 0 ? (
                   <div className="rounded-3xl border border-white/10 bg-white/5 px-6 py-10 text-center text-white/70 shadow-lg shadow-slate-900/30 backdrop-blur">
-                    No events to review yet. Encourage organisers to submit upcoming meetups.
+                    {showPendingEventsOnly && events.length > 0
+                      ? 'No pending events right now. Toggle the filter to review approved or rejected submissions.'
+                      : 'No events to review yet. Encourage organisers to submit upcoming meetups.'}
                   </div>
                 ) : (
                   <div className="grid gap-4">
-                    {events.map((event) => {
+                    {filteredEvents.map((event) => {
                       const status = event.moderationStatus || 'approved'
                       const isPending = status === 'pending'
                       const isRejected = status === 'rejected'
@@ -878,7 +1189,11 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                   </div>
                 )}
 
-                {businesses.length === 0 ? (
+                {sectionErrors.businesses ? (
+                  <div className="rounded-3xl border border-rose-300/40 bg-rose-500/10 px-6 py-4 text-sm text-rose-100">
+                    {sectionErrors.businesses}
+                  </div>
+                ) : businesses.length === 0 ? (
                   <div className="rounded-3xl border border-white/10 bg-white/5 px-6 py-10 text-center text-white/70 shadow-lg shadow-slate-900/30 backdrop-blur">
                     No business listings yet. They will appear here once submitted.
                   </div>
@@ -983,13 +1298,50 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                     </p>
                   </div>
                   <span className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-white/70">
-                    {members.length} members
+                    {memberSearchApplied
+                      ? `${members.length} matching ${
+                          members.length === 1 ? 'member' : 'members'
+                        }`
+                      : membersTotal
+                        ? `${members.length} of ${membersTotal} members`
+                        : `${members.length} members`}
                   </span>
                 </div>
 
-                {members.length === 0 ? (
+                <form onSubmit={handleMemberSearch} className="flex flex-wrap items-center gap-3">
+                  <input
+                    type="search"
+                    value={memberQuery}
+                    onChange={(event) => setMemberQuery(event.target.value)}
+                    placeholder="Search by name, email, or area"
+                    className="w-full max-w-sm rounded-2xl border border-white/15 bg-white/90 px-4 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-200/40"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSearchingMembers}
+                    className="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSearchingMembers ? 'Searching…' : 'Search'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSearchingMembers || (!memberSearchApplied && !memberQuery)}
+                    onClick={() => void handleClearMemberSearch()}
+                    className="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Reset
+                  </button>
+                </form>
+
+                {sectionErrors.users ? (
+                  <div className="rounded-3xl border border-rose-300/40 bg-rose-500/10 px-6 py-4 text-sm text-rose-100">
+                    {sectionErrors.users}
+                  </div>
+                ) : members.length === 0 ? (
                   <div className="rounded-3xl border border-white/10 bg-white/5 px-6 py-10 text-center text-white/70 shadow-lg shadow-slate-900/30 backdrop-blur">
-                    No community members yet.
+                    {memberSearchApplied
+                      ? 'No members matched this search. Try another term or reset the filter.'
+                      : 'No community members yet.'}
                   </div>
                 ) : (
                   <div className="overflow-x-auto rounded-3xl border border-white/10 bg-white/5 shadow-lg shadow-slate-900/40 backdrop-blur">
@@ -1029,6 +1381,165 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                     </table>
                   </div>
                 )}
+              </section>
+
+              {/* Admin Messaging */}
+              <section className="space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h3 className="flex items-center gap-2 text-xl font-black text-white">
+                      <span className="text-2xl">💬</span> Admin messaging
+                    </h3>
+                    <p className="text-sm text-white/60">
+                      Send quick updates to members or broadcast announcements to the entire community.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => void refreshAdminMessagesList()}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white"
+                  >
+                    🔁 Refresh history
+                  </button>
+                </div>
+
+                {messagingFeedback && (
+                  <div
+                    className={`rounded-2xl border px-4 py-3 text-sm ${
+                      messagingFeedback.type === 'error'
+                        ? 'border-rose-300/40 bg-rose-500/10 text-rose-100'
+                        : 'border-emerald-300/40 bg-emerald-500/10 text-emerald-100'
+                    }`}
+                  >
+                    {messagingFeedback.message}
+                  </div>
+                )}
+
+                {sectionErrors.messages && (
+                  <div className="rounded-2xl border border-rose-300/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+                    {sectionErrors.messages}
+                  </div>
+                )}
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <form
+                    onSubmit={handleTargetedMessageSubmit}
+                    className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/70 shadow-lg shadow-slate-900/40 backdrop-blur"
+                  >
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">
+                        Direct message
+                      </p>
+                      <p>Reach out to an individual member with guidance or reminders.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">
+                        Recipient
+                      </label>
+                      <select
+                        value={messageForm.recipientId}
+                        onChange={(event) =>
+                          setMessageForm((prev) => ({
+                            ...prev,
+                            recipientId: event.target.value,
+                          }))
+                        }
+                        disabled={messagingLoading || members.length === 0}
+                        className="w-full rounded-2xl border border-white/20 bg-slate-950/40 px-3 py-2 text-sm font-semibold text-white/80 focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-400/30 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <option value="">Select community member</option>
+                        {members.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.username} • {member.email}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">
+                        Message
+                      </label>
+                      <textarea
+                        value={messageForm.content}
+                        onChange={(event) =>
+                          setMessageForm((prev) => ({
+                            ...prev,
+                            content: event.target.value,
+                          }))
+                        }
+                        placeholder="Share reminders, approvals, or follow-ups…"
+                        rows={4}
+                        className="w-full rounded-2xl border border-white/20 bg-white/90 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 focus:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-200/40"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={
+                        messagingLoading ||
+                        members.length === 0 ||
+                        !messageForm.recipientId ||
+                        !messageForm.content.trim()
+                      }
+                      className="w-full rounded-2xl bg-gradient-to-r from-red-500 via-rose-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-rose-500/40 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {messagingLoading ? 'Sending…' : 'Send message'}
+                    </button>
+                  </form>
+
+                  <form
+                    onSubmit={handleBroadcastMessageSubmit}
+                    className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/70 shadow-lg shadow-slate-900/40 backdrop-blur"
+                  >
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">
+                        Broadcast update
+                      </p>
+                      <p>Send a short announcement to every member inbox.</p>
+                    </div>
+                    <textarea
+                      value={broadcastContent}
+                      onChange={(event) => setBroadcastContent(event.target.value)}
+                      placeholder="Example: Marketplace maintenance tonight at 8pm…"
+                      rows={6}
+                      className="w-full rounded-2xl border border-white/20 bg-white/90 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 focus:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-200/40"
+                    />
+                    <button
+                      type="submit"
+                      disabled={messagingLoading || !broadcastContent.trim()}
+                      className="w-full rounded-2xl border border-white/20 px-4 py-2 text-sm font-semibold text-white/80 transition hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {messagingLoading ? 'Broadcasting…' : 'Broadcast to all members'}
+                    </button>
+                  </form>
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-slate-900/40 backdrop-blur">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h4 className="text-lg font-semibold text-white">Recent admin messages</h4>
+                    <span className="text-xs text-white/60">
+                      Showing {Math.min(adminMessages.length, 8)} of {adminMessages.length}
+                    </span>
+                  </div>
+                  {adminMessages.length === 0 ? (
+                    <p className="mt-4 text-sm text-white/60">
+                      No admin messages yet. Use the tools above to send your first update.
+                    </p>
+                  ) : (
+                    <ul className="mt-4 space-y-3">
+                      {adminMessages.slice(0, 8).map((message) => (
+                        <li
+                          key={message.id}
+                          className="rounded-2xl border border-white/10 bg-white/5 p-3 text-white/80"
+                        >
+                          <div className="flex items-center justify-between text-xs text-white/60">
+                            <span>{message.recipientName || 'Community member'}</span>
+                            <span>{formatDate(message.createdAt)}</span>
+                          </div>
+                          <p className="mt-2 text-sm text-white/80">{message.content}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </section>
             </div>
           )}

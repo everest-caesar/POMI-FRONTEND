@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Messaging from '../components/Messaging'
 import authService from '../services/authService'
@@ -16,6 +16,14 @@ export default function MessagesPage() {
     }
   }, [token, user, navigate])
 
+  const handleBackNavigation = useCallback(() => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      navigate(-1)
+    } else {
+      navigate('/')
+    }
+  }, [navigate])
+
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -29,11 +37,20 @@ export default function MessagesPage() {
       {/* Navigation */}
       <nav className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
-          <button
-            onClick={() => navigate('/')}
-            className="group flex items-center gap-3 hover:opacity-80 transition"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 via-rose-500 to-orange-400 text-2xl font-black text-white shadow-lg shadow-red-500/40">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBackNavigation}
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white"
+              aria-label="Go back"
+            >
+              <span className="text-base">←</span>
+              <span className="hidden sm:inline">Back</span>
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="group flex items-center gap-3 hover:opacity-80 transition"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 via-rose-500 to-orange-400 text-2xl font-black text-white shadow-lg shadow-red-500/40">
               P
             </div>
             <div>
@@ -41,6 +58,7 @@ export default function MessagesPage() {
               <p className="text-lg font-black text-white">Messages</p>
             </div>
           </button>
+          </div>
 
           <div className="flex items-center gap-4">
             <span className="text-sm text-white/70">
