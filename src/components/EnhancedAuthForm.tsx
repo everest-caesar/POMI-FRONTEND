@@ -39,11 +39,9 @@ export default function EnhancedAuthForm({
     age: '',
     area: '',
     workOrSchool: '',
-    adminInviteCode: '',
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [isAdminSignup, setIsAdminSignup] = useState(false)
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -57,7 +55,6 @@ export default function EnhancedAuthForm({
     setLoading(true)
     let parsedAge: number | undefined = undefined
     let trimmedWorkOrSchool: string | undefined = ''
-    let trimmedAdminInviteCode: string | undefined = undefined
 
     try {
       // Validation
@@ -120,15 +117,6 @@ export default function EnhancedAuthForm({
           setLoading(false)
           return
         }
-
-        if (isAdminSignup) {
-          trimmedAdminInviteCode = formData.adminInviteCode.trim()
-          if (!trimmedAdminInviteCode) {
-            setError('Admin invite code is required for admin registration')
-            setLoading(false)
-            return
-          }
-        }
       }
 
       let response
@@ -140,7 +128,6 @@ export default function EnhancedAuthForm({
           age: parsedAge as number,
           area: formData.area,
           workOrSchool: trimmedWorkOrSchool as string,
-          adminInviteCode: trimmedAdminInviteCode,
         })
       } else {
         response = await authService.login({
@@ -303,43 +290,10 @@ export default function EnhancedAuthForm({
         )}
 
         {authMode === 'register' && (
-          <div className="animate-slideInUp" style={{ animationDelay: '0.35s' }}>
-            <div className="flex items-start gap-3 mb-2">
-              <input
-                id="adminSignup"
-                type="checkbox"
-                checked={isAdminSignup}
-                onChange={(event) => {
-                  setIsAdminSignup(event.target.checked)
-                  if (!event.target.checked) {
-                    setFormData((prev) => ({ ...prev, adminInviteCode: '' }))
-                  }
-                }}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
-              />
-              <label htmlFor="adminSignup" className="text-gray-900 font-semibold text-sm">
-                Register as an Admin
-              </label>
-            </div>
-            <p className="text-xs text-gray-600 mb-3">
-              Admin accounts require a valid invite code. Enable this only if you have been granted admin access.
-            </p>
-            {isAdminSignup && (
-              <div className="space-y-2">
-                <label className="block text-gray-900 font-semibold text-sm">
-                  Admin Invite Code *
-                </label>
-                <input
-                  type="text"
-                  name="adminInviteCode"
-                  placeholder="Enter your admin invite code"
-                  value={formData.adminInviteCode}
-                  onChange={handleInputChange}
-                  className="w-full bg-gray-50 text-gray-900 px-4 py-2.5 rounded-lg border border-gray-300 hover:border-gray-400 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-sm placeholder:text-gray-600"
-                />
-              </div>
-            )}
-          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            Admin accounts are managed separately by the operations team. Complete this form only for
+            community member access.
+          </p>
         )}
       </div>
 
@@ -371,6 +325,19 @@ export default function EnhancedAuthForm({
         </div>
       </div>
 
+      {authMode === 'login' && (
+        <p className="text-center text-xs text-gray-500">
+          Admin team?{' '}
+          <a
+            href="/admin"
+            className="font-semibold text-red-600 underline decoration-red-200 underline-offset-4"
+          >
+            Open the secure console
+          </a>
+          .
+        </p>
+      )}
+
       {/* Mode Toggle */}
       <div className="text-center">
         <p className="text-gray-900 text-sm mb-2">
@@ -389,9 +356,7 @@ export default function EnhancedAuthForm({
               age: '',
               area: '',
               workOrSchool: '',
-              adminInviteCode: '',
             })
-            setIsAdminSignup(false)
           }}
           disabled={loading}
           className="text-red-600 hover:text-red-700 font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-colors px-4 py-2 rounded-lg hover:bg-red-50"

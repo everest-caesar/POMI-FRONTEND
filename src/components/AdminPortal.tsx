@@ -183,6 +183,31 @@ const formatCurrency = (value?: number | null) => {
   }).format(value)
 }
 
+const formatRelativeTimestamp = (value?: Date | string | null) => {
+  if (!value) return 'Awaiting sync'
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown'
+  }
+  const diff = Date.now() - date.getTime()
+  if (diff < 60_000) return 'Just now'
+  if (diff < 3_600_000) {
+    const minutes = Math.floor(diff / 60_000)
+    return `${minutes} minute${minutes === 1 ? '' : 's'} ago`
+  }
+  if (diff < 86_400_000) {
+    const hours = Math.floor(diff / 3_600_000)
+    return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  }
+  return date.toLocaleString('en-CA', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProps) {
   const [metrics, setMetrics] = useState<AdminMetrics | null>(null)
   const [events, setEvents] = useState<AdminEvent[]>([])
@@ -216,6 +241,8 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
     message: string
   } | null>(null)
   const [messagingLoading, setMessagingLoading] = useState(false)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
+  const [downloadingSnapshot, setDownloadingSnapshot] = useState(false)
 
   const filteredEvents = useMemo(
     () =>
@@ -330,6 +357,8 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
         setAdminMessages([])
         nextErrors.messages = getErrorMessage(messagesResult.reason)
       }
+
+      setLastUpdatedAt(new Date())
 
       const fatal = Object.values(nextErrors).every((msg) => Boolean(msg))
       setError(
@@ -463,6 +492,59 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
   useEffect(() => {
     loadAdminData()
   }, [token])
+
+  const scrollToSection = (anchorId: string) => {
+    if (typeof document === 'undefined') return
+    const element = document.getElementById(anchorId)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
+  const handleDownloadSnapshot = () => {
+    try {
+      setDownloadingSnapshot(true)
+      const snapshot = {
+        generatedAt: new Date().toISOString(),
+        metrics,
+        totals: {
+          events: events.length,
+          listings: listings.length,
+          businesses: businesses.length,
+          members: membersTotal ?? members.length,
+        },
+        queues: {
+          pendingEvents: metrics?.pendingEvents ?? 0,
+          pendingListings: metrics?.pendingListings ?? 0,
+          pendingBusinesses: metrics?.pendingBusinesses ?? 0,
+        },
+      }
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
+        type: 'application/json',
+      })
+      const downloadUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = downloadUrl
+      anchor.download = `pomi-admin-snapshot-${Date.now()}.json`
+      anchor.click()
+      URL.revokeObjectURL(downloadUrl)
+      setStatusMessage('Snapshot downloaded successfully.')
+    } catch (err: any) {
+      setError(err?.message || 'Failed to export snapshot')
+    } finally {
+      setTimeout(() => setDownloadingSnapshot(false), 400)
+    }
+  }
+
+  const jumpToEvents = () => {
+    setShowEventCreation(true)
+    scrollToSection('admin-events')
+  }
+
+  const jumpToBusinesses = () => {
+    setShowBusinessUpload(true)
+    scrollToSection('admin-businesses')
+  }
 
   const handleUpdateBusiness = async (
     businessId: string,
@@ -608,43 +690,137 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
     }
   }
 
+  const pendingApprovals =
+    (metrics?.pendingEvents ?? 0) +
+    (metrics?.pendingBusinesses ?? 0) +
+    (metrics?.pendingListings ?? 0)
+
+  const lastUpdatedLabel = formatRelativeTimestamp(lastUpdatedAt)
+
+  const navigationSections = [
+    { id: 'admin-overview', label: 'Overview' },
+    { id: 'admin-marketplace', label: 'Marketplace' },
+    { id: 'admin-events', label: 'Events' },
+    { id: 'admin-businesses', label: 'Businesses' },
+    { id: 'admin-members', label: 'Members' },
+    { id: 'admin-messaging', label: 'Messaging' },
+  ]
+
+  const quickActions = [
+    {
+      title: loading ? 'Refreshing data…' : 'Refresh console',
+      description: 'Pulls the newest approvals, messages, and metrics.',
+      icon: '↻',
+      action: loadAdminData,
+      disabled: loading,
+    },
+    {
+      title: 'New event review',
+      description: 'Open the composer to spotlight official gatherings.',
+      icon: '🎟️',
+      action: jumpToEvents,
+    },
+    {
+      title: 'New business listing',
+      description: 'Guide entrepreneurs through the verification flow.',
+      icon: '🏢',
+      action: jumpToBusinesses,
+    },
+    {
+      title: downloadingSnapshot ? 'Exporting…' : 'Export snapshot',
+      description: 'Download a JSON summary for reporting or audits.',
+      icon: '⬇️',
+      action: handleDownloadSnapshot,
+      disabled: downloadingSnapshot,
+    },
+  ]
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-900/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-2">
-            <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white/70">
-              Admin Console • Internal
-            </p>
-            <h1 className="text-2xl font-black text-white md:text-3xl">Pomi Community Oversight</h1>
-            <p className="max-w-2xl text-sm text-white/70 md:text-base">
-              Review marketplace activity, approve businesses, and keep upcoming events running smoothly. Use the quick actions to refresh data or export reports.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={loadAdminData}
-              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white"
-            >
-              🔄 Refresh data
-            </button>
-            {onBack && (
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/95 backdrop-blur supports-[backdrop-filter]:bg-slate-950/70">
+        <div className="mx-auto max-w-7xl space-y-6 px-6 py-6">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="space-y-3">
+              <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-white/70">
+                Pomi Admin • Private
+              </p>
+              <h1 className="text-2xl font-black text-white md:text-3xl">
+                Community safety & marketplace intelligence
+              </h1>
+              <p className="max-w-2xl text-sm text-white/70 md:text-base">
+                One dashboard to approve listings, issue announcements, and keep the Ottawa Habesha
+                community curated. Every action is logged—use the controls below to jump to the queues
+                that need attention first.
+              </p>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-white/60">
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1">
+                  <span className="text-white/80">⏱️ Last sync:</span> {lastUpdatedLabel}
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1">
+                  <span className="text-white/80">📬 Pending approvals:</span> {pendingApprovals}
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-shrink-0 flex-wrap items-center gap-3">
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white"
+                >
+                  ← Back
+                </button>
+              )}
               <button
-                onClick={onBack}
-                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white"
+                onClick={onLogout}
+                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-red-500/40 transition hover:-translate-y-0.5"
               >
-                ← Back to access
+                Log out
               </button>
-            )}
-            <button
-              onClick={onLogout}
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-red-500 via-rose-500 to-orange-500 px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-red-500/40 transition hover:-translate-y-0.5"
-            >
-              Log out
-            </button>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {quickActions.map((action) => (
+              <button
+                key={action.title}
+                onClick={action.action}
+                disabled={action.disabled}
+                className="flex flex-col items-start rounded-3xl border border-white/10 bg-white/5 px-5 py-4 text-left shadow-lg shadow-slate-900/30 transition hover:-translate-y-1 hover:border-white/30 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                <span className="text-2xl">{action.icon}</span>
+                <p className="mt-3 text-sm font-semibold text-white">{action.title}</p>
+                <p className="mt-1 text-xs text-white/70">{action.description}</p>
+              </button>
+            ))}
           </div>
         </div>
       </header>
+      <div className="border-b border-white/10 bg-slate-950/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <nav className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-white/60">
+            {navigationSections.map((section) => (
+              <button
+                key={section.id}
+                onClick={() => scrollToSection(section.id)}
+                className="rounded-full border border-white/15 px-3 py-1 text-white/70 transition hover:border-white/40 hover:text-white"
+              >
+                {section.label}
+              </button>
+            ))}
+          </nav>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-white/60">
+            <span className="rounded-full border border-white/15 px-3 py-1">
+              Events queue: {metrics?.pendingEvents ?? 0}
+            </span>
+            <span className="rounded-full border border-white/15 px-3 py-1">
+              Listings queue: {metrics?.pendingListings ?? 0}
+            </span>
+            <span className="rounded-full border border-white/15 px-3 py-1">
+              Businesses queue: {metrics?.pendingBusinesses ?? 0}
+            </span>
+          </div>
+        </div>
+      </div>
 
       <main className="mx-auto max-w-7xl space-y-12 px-6 py-10">
         {loading && (
@@ -663,7 +839,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
         {!loading && !error && (
           <div className="space-y-12">
             {/* Metrics Overview */}
-            <section>
+            <section id="admin-overview">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-black text-white">Executive snapshot</h2>
@@ -731,7 +907,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
             </section>
 
               {/* Marketplace Moderation */}
-              <section className="space-y-4">
+              <section id="admin-marketplace" className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h3 className="flex items-center gap-2 text-xl font-black text-white">
@@ -870,7 +1046,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
               </section>
 
               {/* Events Overview */}
-              <section className="space-y-4">
+              <section id="admin-events" className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h3 className="flex items-center gap-2 text-xl font-black text-white">
@@ -1154,7 +1330,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
               </section>
 
               {/* Business Management */}
-              <section className="space-y-4">
+              <section id="admin-businesses" className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h3 className="flex items-center gap-2 text-xl font-black text-white">
@@ -1287,7 +1463,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
               </section>
 
               {/* Community Members */}
-              <section className="space-y-4">
+              <section id="admin-members" className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h3 className="flex items-center gap-2 text-xl font-black text-white">
@@ -1384,7 +1560,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
               </section>
 
               {/* Admin Messaging */}
-              <section className="space-y-5">
+              <section id="admin-messaging" className="space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h3 className="flex items-center gap-2 text-xl font-black text-white">
