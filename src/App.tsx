@@ -320,6 +320,52 @@ function App() {
     return () => clearInterval(interval)
   }, [isLoggedIn])
 
+  // Fetch admin messages from the backend
+  useEffect(() => {
+    if (!isLoggedIn) {
+      return
+    }
+
+    const fetchAdminMessages = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1'}/messages/admin/inbox`, {
+          headers: {
+            'Authorization': `Bearer ${authService.getToken()}`,
+          },
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          const messages = result.data || []
+
+          // Convert backend messages to frontend format
+          const formattedMessages: AdminMessage[] = messages.map((msg: any) => ({
+            id: msg._id || msg.id,
+            sender: 'admin',
+            body: msg.content,
+            createdAt: msg.createdAt,
+            read: msg.isRead,
+          }))
+
+          setAdminMessages(formattedMessages)
+
+          // Count unread admin messages
+          const unreadCount = formattedMessages.filter(msg => !msg.read).length
+          setUnreadAdminMessages(unreadCount)
+        }
+      } catch (error) {
+        console.error('Failed to fetch admin messages:', error)
+      }
+    }
+
+    fetchAdminMessages()
+
+    // Refresh admin messages every 60 seconds
+    const interval = setInterval(fetchAdminMessages, 60000)
+
+    return () => clearInterval(interval)
+  }, [isLoggedIn])
+
   const handleAuthSuccess = (user: AuthUser) => {
     setCurrentUser(user)
     localStorage.setItem('userData', JSON.stringify(user))
@@ -353,7 +399,7 @@ function App() {
     triggerFlash('You have been signed out.')
   }
 
-  const handleSendMessageToAdmin = (event: FormEvent<HTMLFormElement>) => {
+  const handleSendMessageToAdmin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     if (!messageDraft.trim()) {
@@ -366,17 +412,38 @@ function App() {
       return
     }
 
-    const newMessage: AdminMessage = {
-      id: `member-${Date.now()}`,
-      sender: 'member',
-      body: messageDraft.trim(),
-      createdAt: new Date().toISOString(),
-      read: true,
-    }
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1'}/messages/admin/reply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authService.getToken()}`,
+        },
+        body: JSON.stringify({
+          content: messageDraft.trim(),
+        }),
+      })
 
-    setAdminMessages((prev) => [...prev, newMessage])
-    setInboxFilter('sent')
-    setMessageDraft('')
+      if (response.ok) {
+        const newMessage: AdminMessage = {
+          id: `member-${Date.now()}`,
+          sender: 'member',
+          body: messageDraft.trim(),
+          createdAt: new Date().toISOString(),
+          read: true,
+        }
+
+        setAdminMessages((prev) => [...prev, newMessage])
+        setInboxFilter('sent')
+        setMessageDraft('')
+        triggerFlash('Message sent to admin team')
+      } else {
+        triggerFlash('Failed to send message. Please try again.')
+      }
+    } catch (error) {
+      console.error('Failed to send message to admin:', error)
+      triggerFlash('Failed to send message. Please try again.')
+    }
   }
 
   const handleOpenAdminInbox = () => {
@@ -457,12 +524,13 @@ function App() {
             </button>
             <button
               onClick={handleOpenAdminInbox}
-              className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-xl text-white/80 transition hover:border-white/40 hover:text-white"
+              className="relative inline-flex items-center gap-2 rounded-full border-2 border-amber-400/60 bg-gradient-to-r from-amber-500/20 to-orange-500/20 px-4 py-2 text-sm font-semibold text-white transition hover:border-amber-300 hover:from-amber-500/30 hover:to-orange-500/30 shadow-lg shadow-amber-500/20"
               aria-label={isLoggedIn ? 'Open messages from the admin team' : 'Log in to see admin messages'}
             >
-              💬
+              <span className="text-lg">💬</span>
+              <span>Admin</span>
               {unreadAdminMessages > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white shadow shadow-red-500/40">
+                <span className="absolute -right-2 -top-2 flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 px-1.5 text-xs font-bold text-white shadow-lg shadow-red-500/60 ring-2 ring-white/20 animate-pulse">
                   {unreadAdminMessages > 9 ? '9+' : unreadAdminMessages}
                 </span>
               )}
@@ -819,7 +887,7 @@ function App() {
           <div className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/90 p-8 shadow-[0_30px_60px_rgba(15,23,42,0.6)]">
             <button
               onClick={() => setActiveFeature(null)}
-              className="absolute right-4 top-4 rounded-full bg-white/10 px-3 py-1 text-lg text-white/70 transition hover:bg-white/20 hover:text-white"
+              className="absolute right-4 top-4 rounded-full bg-red-500/90 hover:bg-red-600 px-3 py-1 text-lg text-white font-bold transition shadow-lg shadow-red-500/50 ring-2 ring-white/20"
             >
               ×
             </button>
@@ -877,7 +945,7 @@ function App() {
           <div className="relative w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/90 p-8 shadow-[0_30px_60px_rgba(15,23,42,0.65)]">
             <button
               onClick={() => setShowCalendarModal(false)}
-              className="absolute right-4 top-4 rounded-full bg-white/10 px-3 py-1 text-lg text-white/70 transition hover:bg-white/20 hover:text-white"
+              className="absolute right-4 top-4 rounded-full bg-red-500/90 hover:bg-red-600 px-3 py-1 text-lg text-white font-bold transition shadow-lg shadow-red-500/50 ring-2 ring-white/20"
               aria-label="Close Ethiopian calendar highlights"
             >
               ×
@@ -925,7 +993,7 @@ function App() {
           <div className="relative w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/95 p-8 shadow-[0_30px_60px_rgba(15,23,42,0.65)]">
             <button
               onClick={() => setShowAdminInbox(false)}
-              className="absolute right-4 top-4 rounded-full bg-white/10 px-3 py-1 text-lg text-white/70 transition hover:bg-white/20 hover:text-white"
+              className="absolute right-4 top-4 rounded-full bg-red-500/90 hover:bg-red-600 px-3 py-1 text-lg text-white font-bold transition shadow-lg shadow-red-500/50 ring-2 ring-white/20"
               aria-label="Close admin messages"
             >
               ×
@@ -1051,7 +1119,7 @@ function App() {
           <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-gray-200 bg-white p-8 shadow-[0_30px_60px_rgba(0,0,0,0.15)]">
             <button
               onClick={() => setShowAuthModal(false)}
-              className="absolute right-4 top-4 rounded-full bg-gray-100 px-3 py-1 text-lg text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
+              className="absolute right-4 top-4 rounded-full bg-red-500 hover:bg-red-600 px-3 py-1 text-lg text-white font-bold transition shadow-lg shadow-red-500/50 ring-2 ring-red-200"
             >
               ×
             </button>

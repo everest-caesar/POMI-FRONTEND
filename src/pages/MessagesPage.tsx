@@ -14,6 +14,11 @@ export default function MessagesPage() {
       navigate('/', { replace: true, state: { requireAuth: true } })
       return
     }
+    // Redirect admins to admin portal
+    if (user?.isAdmin) {
+      navigate('/admin', { replace: true })
+      return
+    }
   }, [token, user, navigate])
 
   const handleBackNavigation = useCallback(() => {

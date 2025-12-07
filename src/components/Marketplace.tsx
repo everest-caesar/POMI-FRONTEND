@@ -1079,7 +1079,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
                 setSubmissionMessage('')
                 setError('')
               }}
-              className="absolute right-4 top-4 rounded-full bg-gray-100 px-3 py-1 text-lg text-gray-500 transition hover:bg-gray-200"
+              className="absolute right-4 top-4 rounded-full bg-red-500 hover:bg-red-600 px-3 py-1 text-lg text-white font-bold transition shadow-lg shadow-red-500/50 ring-2 ring-red-200"
               aria-label="Close create listing form"
             >
               ×
@@ -1290,7 +1290,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
           <div className="relative grid w-full max-w-4xl gap-6 rounded-3xl border border-red-100 bg-white/95 p-8 shadow-2xl backdrop-blur-lg md:grid-cols-[1.4fr,1fr]">
             <button
               onClick={() => setSelectedListing(null)}
-              className="absolute right-4 top-4 rounded-full bg-gray-100 px-3 py-1 text-lg text-gray-500 transition hover:bg-gray-200"
+              className="absolute right-4 top-4 rounded-full bg-red-500 hover:bg-red-600 px-3 py-1 text-lg text-white font-bold transition shadow-lg shadow-red-500/50 ring-2 ring-red-200"
               aria-label="Close listing detail"
             >
               ×
@@ -1395,7 +1395,7 @@ export default function Marketplace({ token, isAdmin = false }: MarketplaceProps
                 setMessageText('')
                 setMessageConfirmation('')
               }}
-              className="absolute right-4 top-4 rounded-full bg-gray-100 px-3 py-1 text-lg text-gray-500 transition hover:bg-gray-200"
+              className="absolute right-4 top-4 rounded-full bg-red-500 hover:bg-red-600 px-3 py-1 text-lg text-white font-bold transition shadow-lg shadow-red-500/50 ring-2 ring-red-200"
               aria-label="Close messaging"
             >
               ×

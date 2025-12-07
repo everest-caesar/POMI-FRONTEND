@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import axiosInstance from '../utils/axios'
 import authService from '../services/authService'
 
@@ -17,6 +17,7 @@ interface ForumPost {
   }
   repliesCount?: number
   viewsCount?: number
+  upvotes?: number
   createdAt: string
 }
 
@@ -98,6 +99,8 @@ const formatRelativeTime = (value: string) => {
 }
 
 export default function ForumPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [posts, setPosts] = useState<ForumPost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -111,8 +114,77 @@ export default function ForumPage() {
   const [composerSuccess, setComposerSuccess] = useState<string | null>(null)
   const [composerLoading, setComposerLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [filtersHydrated, setFiltersHydrated] = useState(false)
+  const lastSyncedQueryRef = useRef(location.search)
 
   const isAuthenticated = authService.isAuthenticated()
+  const isAdmin = Boolean(authService.getUserData()?.isAdmin)
+
+  useEffect(() => {
+    if (isAdmin) {
+      navigate('/admin', { replace: true })
+    }
+  }, [isAdmin, navigate])
+
+  useEffect(() => {
+    if (filtersHydrated && location.search === lastSyncedQueryRef.current) {
+      return
+    }
+
+    const params = new URLSearchParams(location.search)
+    const communityParam = params.get('community')
+    const searchParam = params.get('search')
+    const sortParam = params.get('sort')
+
+    if (communityParam && COMMUNITY_CONFIG.some((community) => community.id === communityParam)) {
+      setActiveCommunity(communityParam)
+    } else {
+      setActiveCommunity('all')
+    }
+
+    if (searchParam !== null) {
+      setSearchInput(searchParam)
+      setSearchTerm(searchParam)
+    } else {
+      setSearchInput('')
+      setSearchTerm('')
+    }
+
+    if (sortParam === 'new') {
+      setSelectedSort('new')
+    } else {
+      setSelectedSort('top')
+    }
+
+    lastSyncedQueryRef.current = location.search
+    setFiltersHydrated(true)
+  }, [filtersHydrated, location.search])
+
+  useEffect(() => {
+    if (!filtersHydrated) {
+      return
+    }
+
+    const params = new URLSearchParams()
+    if (activeCommunity !== 'all') {
+      params.set('community', activeCommunity)
+    }
+    if (searchTerm.trim()) {
+      params.set('search', searchTerm.trim())
+    }
+    if (selectedSort === 'new') {
+      params.set('sort', 'new')
+    }
+
+    const queryString = params.toString()
+    const normalized = queryString ? `?${queryString}` : ''
+    if (normalized === lastSyncedQueryRef.current) {
+      return
+    }
+
+    lastSyncedQueryRef.current = normalized
+    navigate({ pathname: location.pathname, search: normalized }, { replace: true })
+  }, [activeCommunity, searchTerm, selectedSort, filtersHydrated, navigate, location.pathname])
 
   const fetchPosts = useCallback(async () => {
     setLoading(true)
@@ -143,8 +215,11 @@ export default function ForumPage() {
   }, [activeCommunity, searchTerm])
 
   useEffect(() => {
+    if (!filtersHydrated) {
+      return
+    }
     void fetchPosts()
-  }, [fetchPosts])
+  }, [fetchPosts, filtersHydrated])
 
   const visiblePosts = useMemo(() => {
     const subset =
@@ -192,6 +267,40 @@ export default function ForumPage() {
       .sort((a, b) => b.total - a.total)
       .slice(0, 4)
   }, [posts])
+
+  const trendingThreads = useMemo(() => {
+    if (activeCommunity === 'all') return []
+
+    // Get posts from the active community only
+    const communityPosts = posts.filter(post => post.category === activeCommunity)
+
+    // Sort by upvotes to show trending threads
+    return communityPosts
+      .sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0))
+      .slice(0, 5)
+  }, [posts, activeCommunity])
+
+  const activeFilterBadges = useMemo(() => {
+    const badges: string[] = []
+
+    if (activeCommunity !== 'all') {
+      const label =
+        COMMUNITY_CONFIG.find((community) => community.id === activeCommunity)?.label ??
+        'Community filter'
+      badges.push(label)
+    }
+
+    const trimmedSearch = searchTerm.trim()
+    if (trimmedSearch) {
+      badges.push(`Search: ${trimmedSearch}`)
+    }
+
+    if (selectedSort === 'new') {
+      badges.push('Newest first')
+    }
+
+    return badges
+  }, [activeCommunity, searchTerm, selectedSort])
 
   const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -390,7 +499,34 @@ export default function ForumPage() {
                 Newest
               </button>
             </div>
+            {activeFilterBadges.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-white/70">
+                <span>Active filters:</span>
+                {activeFilterBadges.map((badge) => (
+                  <span
+                    key={badge}
+                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-white"
+                  >
+                    {badge}
+                  </span>
+                ))}
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="rounded-full border border-transparent px-3 py-1 font-semibold text-white/70 transition hover:text-white"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
           </div>
+
+          {!loading && !error && (
+            <p className="text-xs text-white/60">
+              Showing {visiblePosts.length}{' '}
+              {visiblePosts.length === 1 ? 'thread' : 'threads'}
+            </p>
+          )}
 
           {loading ? (
             <div className="rounded-3xl border border-white/10 bg-white/10 p-8 text-center text-sm text-white/70">
@@ -472,28 +608,57 @@ export default function ForumPage() {
         <aside className="space-y-6">
           <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/70 shadow-lg shadow-slate-900/40 backdrop-blur">
             <h3 className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">
-              Trending communities
+              {activeCommunity === 'all' ? 'Trending communities' : 'Trending threads'}
             </h3>
             <ul className="space-y-3">
-              {trendingCommunities.map((community, index) => (
-                <li
-                  key={community.id}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg font-bold text-white/50">{index + 1}</span>
-                    <div>
-                      <p className="font-semibold text-white">
-                        {community.badge} {community.label}
-                      </p>
-                      <p className="text-xs text-white/60">{community.description}</p>
+              {activeCommunity === 'all' ? (
+                trendingCommunities.map((community, index) => (
+                  <li
+                    key={community.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg font-bold text-white/50">{index + 1}</span>
+                      <div>
+                        <p className="font-semibold text-white">
+                          {community.badge} {community.label}
+                        </p>
+                        <p className="text-xs text-white/60">{community.description}</p>
+                      </div>
                     </div>
-                  </div>
-                  <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/60">
-                    {community.total} threads
-                  </span>
-                </li>
-              ))}
+                    <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/60">
+                      {community.total} threads
+                    </span>
+                  </li>
+                ))
+              ) : (
+                trendingThreads.length > 0 ? (
+                  trendingThreads.map((thread, index) => (
+                    <li
+                      key={thread._id}
+                      className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10 transition"
+                      onClick={() => navigate(`/forums/${thread._id}`)}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="text-sm font-bold text-white/50">{index + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-white text-sm line-clamp-2">
+                            {thread.title}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1 text-xs text-white/60">
+                            <span>⬆️ {thread.upvotes || 0}</span>
+                            <span>💬 {thread.repliesCount || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-white/50 text-sm py-4 text-center">
+                    No threads yet in this community
+                  </li>
+                )
+              )}
             </ul>
           </div>
 
@@ -516,7 +681,7 @@ export default function ForumPage() {
           <div className="relative w-full max-w-3xl rounded-[32px] border border-white/10 bg-white/95 p-8 text-slate-900 shadow-2xl">
             <button
               onClick={() => setShowComposer(false)}
-              className="absolute right-4 top-4 rounded-full bg-slate-100 px-3 py-1 text-lg text-slate-500 transition hover:bg-slate-200"
+              className="absolute right-4 top-4 rounded-full bg-red-500 hover:bg-red-600 px-3 py-1 text-lg text-white font-bold transition shadow-lg shadow-red-500/50 ring-2 ring-red-200"
             >
               ×
             </button>

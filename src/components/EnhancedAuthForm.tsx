@@ -8,24 +8,6 @@ interface EnhancedAuthFormProps {
   onModeChange: (mode: 'login' | 'register') => void
 }
 
-const OTTAWA_AREAS = [
-  'Downtown Ottawa',
-  'Barrhaven',
-  'Kanata',
-  'Nepean',
-  'Gloucester',
-  'Orleans',
-  'Vanier',
-  'Westboro',
-  'Rockcliffe Park',
-  'Sandy Hill',
-  'The Glebe',
-  'Bytown',
-  'South Ottawa',
-  'North Ottawa',
-  'Outside Ottawa',
-]
-
 export default function EnhancedAuthForm({
   authMode,
   onSuccess,
@@ -37,8 +19,6 @@ export default function EnhancedAuthForm({
     password: '',
     username: '',
     age: '',
-    area: '',
-    workOrSchool: '',
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -54,7 +34,6 @@ export default function EnhancedAuthForm({
     setError('')
     setLoading(true)
     let parsedAge: number | undefined = undefined
-    let trimmedWorkOrSchool: string | undefined = ''
 
     try {
       // Validation
@@ -104,19 +83,6 @@ export default function EnhancedAuthForm({
           return
         }
         parsedAge = ageValue
-
-        if (!formData.area) {
-          setError('Please select the area you live in')
-          setLoading(false)
-          return
-        }
-
-        trimmedWorkOrSchool = formData.workOrSchool.trim()
-        if (!trimmedWorkOrSchool) {
-          setError('Please share your school or workplace')
-          setLoading(false)
-          return
-        }
       }
 
       let response
@@ -126,8 +92,6 @@ export default function EnhancedAuthForm({
           password: formData.password,
           username: formData.username,
           age: parsedAge as number,
-          area: formData.area,
-          workOrSchool: trimmedWorkOrSchool as string,
         })
       } else {
         response = await authService.login({
@@ -248,47 +212,6 @@ export default function EnhancedAuthForm({
           </div>
         )}
 
-        {/* Area - Registration only */}
-        {authMode === 'register' && (
-          <div className="animate-slideInUp" style={{ animationDelay: '0.25s' }}>
-            <label className="block text-gray-900 font-semibold mb-2 text-sm">
-              Area in Ottawa *
-            </label>
-            <select
-              name="area"
-              value={formData.area}
-              onChange={handleInputChange}
-              required
-              className="w-full bg-gray-50 text-gray-900 px-4 py-2.5 rounded-lg border border-gray-300 hover:border-gray-400 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-sm"
-            >
-              <option value="">Select your area...</option>
-              {OTTAWA_AREAS.map((area) => (
-                <option key={area} value={area}>
-                  {area}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Work or School - Registration only */}
-        {authMode === 'register' && (
-          <div className="animate-slideInUp" style={{ animationDelay: '0.3s' }}>
-            <label className="block text-gray-900 font-semibold mb-2 text-sm">
-              School or Workplace *
-            </label>
-            <input
-              type="text"
-              name="workOrSchool"
-              placeholder="e.g., Carleton University or Tech Startup Inc."
-              value={formData.workOrSchool}
-              onChange={handleInputChange}
-              required
-              className="w-full bg-gray-50 text-gray-900 px-4 py-2.5 rounded-lg border border-gray-300 hover:border-gray-400 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-sm placeholder:text-gray-600"
-            />
-          </div>
-        )}
-
         {authMode === 'register' && (
           <p className="text-xs text-gray-500 mt-2">
             Admin accounts are managed separately by the operations team. Complete this form only for
@@ -354,8 +277,6 @@ export default function EnhancedAuthForm({
               password: '',
               username: '',
               age: '',
-              area: '',
-              workOrSchool: '',
             })
           }}
           disabled={loading}

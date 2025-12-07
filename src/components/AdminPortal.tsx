@@ -215,6 +215,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
   const [businesses, setBusinesses] = useState<AdminBusiness[]>([])
   const [members, setMembers] = useState<CommunityMember[]>([])
   const [adminMessages, setAdminMessages] = useState<AdminMessage[]>([])
+  const [adminInboxMessages, setAdminInboxMessages] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sectionErrors, setSectionErrors] = useState<SectionErrors>(
@@ -286,6 +287,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
   }
 
   const fetchAdminMessagesData = () => fetchJson('/admin/messages')
+  const fetchAdminInboxData = () => fetchJson('/admin/messages/inbox')
 
   const loadAdminData = async () => {
     setLoading(true)
@@ -300,6 +302,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
         listingsResult,
         usersResult,
         messagesResult,
+        inboxResult,
       ] = await Promise.allSettled<any>([
         fetchJson('/admin/overview'),
         fetchJson('/admin/events'),
@@ -307,6 +310,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
         fetchJson('/admin/marketplace'),
         fetchAdminUsersData(),
         fetchAdminMessagesData(),
+        fetchAdminInboxData(),
       ])
 
       if (overviewResult.status === 'fulfilled') {
@@ -356,6 +360,12 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
       } else {
         setAdminMessages([])
         nextErrors.messages = getErrorMessage(messagesResult.reason)
+      }
+
+      if (inboxResult.status === 'fulfilled') {
+        setAdminInboxMessages(inboxResult.value.data || [])
+      } else {
+        setAdminInboxMessages([])
       }
 
       setLastUpdatedAt(new Date())
@@ -1711,6 +1721,42 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                             <span>{formatDate(message.createdAt)}</span>
                           </div>
                           <p className="mt-2 text-sm text-white/80">{message.content}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-slate-900/40 backdrop-blur">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h4 className="text-lg font-semibold text-white">Messages from Users</h4>
+                    <span className="text-xs text-white/60">
+                      Showing {Math.min(adminInboxMessages.length, 8)} of {adminInboxMessages.length}
+                    </span>
+                  </div>
+                  {adminInboxMessages.length === 0 ? (
+                    <p className="mt-4 text-sm text-white/60">
+                      No messages from users yet. Users can message you through their inbox.
+                    </p>
+                  ) : (
+                    <ul className="mt-4 space-y-3">
+                      {adminInboxMessages.slice(0, 8).map((message) => (
+                        <li
+                          key={message._id || message.id}
+                          className="rounded-2xl border border-white/10 bg-white/5 p-3 text-white/80"
+                        >
+                          <div className="flex items-center justify-between text-xs text-white/60">
+                            <span>
+                              {message.senderId?.username || message.senderName || 'Community member'}
+                            </span>
+                            <span>{formatDate(message.createdAt)}</span>
+                          </div>
+                          <p className="mt-2 text-sm text-white/80">{message.content}</p>
+                          {!message.isRead && (
+                            <span className="mt-2 inline-block rounded-full bg-amber-500/20 px-2 py-1 text-xs font-semibold text-amber-300">
+                              Unread
+                            </span>
+                          )}
                         </li>
                       ))}
                     </ul>

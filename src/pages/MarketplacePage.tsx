@@ -1,10 +1,18 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import Marketplace from '../components/Marketplace'
 import authService from '../services/authService'
 
 export default function MarketplacePage() {
   const token = authService.getToken() || ''
   const isAdmin = Boolean(authService.getUserData()?.isAdmin)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (isAdmin) {
+      navigate('/admin', { replace: true })
+    }
+  }, [isAdmin, navigate])
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
