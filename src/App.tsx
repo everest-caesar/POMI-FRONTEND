@@ -540,14 +540,12 @@ function App() {
             </button>
             <button
               onClick={handleOpenAdminInbox}
-              className="relative inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-rose-600 shadow-lg shadow-rose-500/30 ring-2 ring-rose-100 transition hover:-translate-y-0.5"
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-xl text-white/80 transition hover:border-white/40 hover:text-white"
               aria-label={isLoggedIn ? 'Open messages from the admin team' : 'Log in to see admin messages'}
             >
-              <span className="text-lg">📣</span>
-              <span className="hidden sm:inline">Admin updates</span>
-              <span className="sm:hidden">Admin</span>
+              📣
               {unreadAdminMessages > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-rose-600 px-1.5 text-xs font-bold text-white shadow-lg shadow-red-500/60 ring-2 ring-white/40 animate-pulse">
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white shadow shadow-red-500/40">
                   {unreadAdminMessages > 9 ? '9+' : unreadAdminMessages}
                 </span>
               )}
