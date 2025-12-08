@@ -220,6 +220,15 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
   const [adminInboxMessages, setAdminInboxMessages] = useState<any[]>([])
   const [unreadUserMessages, setUnreadUserMessages] = useState(0)
   const [activeSection, setActiveSection] = useState<AdminSection>('overview')
+  const [selectedConversation, setSelectedConversation] = useState<{
+    userId: string
+    username: string
+    messages: { id: string; senderId: string; senderName: string; content: string; createdAt: string }[]
+  } | null>(null)
+  const [conversationLoading, setConversationLoading] = useState(false)
+  const [conversationError, setConversationError] = useState<string | null>(null)
+  const [conversationReply, setConversationReply] = useState('')
+  const [replySending, setReplySending] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sectionErrors, setSectionErrors] = useState<SectionErrors>(
@@ -450,6 +459,44 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
     }
   }
 
+  const openConversation = async (userId: string, username: string) => {
+    setConversationLoading(true)
+    setConversationError(null)
+    try {
+      const response = await fetch(`${API_BASE_URL}/messages/${userId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to load conversation')
+      }
+      const messages = (payload.data || []).map((message: any) => ({
+        id: message._id || message.id,
+        senderId:
+          typeof message.senderId === 'object' && message.senderId !== null
+            ? message.senderId._id || message.senderId.id || ''
+            : message.senderId || '',
+        senderName:
+          message.senderName ||
+          message.senderId?.username ||
+          message.recipientName ||
+          'Member',
+        content: message.content || '',
+        createdAt: message.createdAt || new Date().toISOString(),
+      }))
+      setSelectedConversation({ userId, username, messages })
+      setMessageForm((prev) => ({ ...prev, recipientId: userId }))
+      await refreshAdminInbox()
+    } catch (err: any) {
+      setConversationError(err.message || 'Failed to open conversation')
+      setSelectedConversation(null)
+    } finally {
+      setConversationLoading(false)
+    }
+  }
+
   const handleTargetedMessageSubmit = async (
     event: React.FormEvent<HTMLFormElement>,
   ) => {
@@ -522,6 +569,31 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
       })
     } finally {
       setMessagingLoading(false)
+    }
+  }
+
+  const handleConversationReply = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!selectedConversation || !conversationReply.trim()) {
+      return
+    }
+    setReplySending(true)
+    setConversationError(null)
+    try {
+      await fetchJson('/admin/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          recipientId: selectedConversation.userId,
+          content: conversationReply.trim(),
+        }),
+      })
+      setConversationReply('')
+      await refreshAdminMessagesList()
+      await openConversation(selectedConversation.userId, selectedConversation.username)
+    } catch (err: any) {
+      setConversationError(err.message || 'Failed to send reply')
+    } finally {
+      setReplySending(false)
     }
   }
 
@@ -1852,6 +1924,144 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                     </button>
                   </form>
                 </div>
+                <div className="grid gap-6 lg:grid-cols-[320px,1fr]">
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-white shadow-lg shadow-slate-900/40 backdrop-blur">
+                    <div className="flex items-center justify-between text-sm">
+                      <h4 className="font-semibold text-white">Messages from members</h4>
+                      <span className="text-xs text-white/60">
+                        {adminInboxMessages.length} total
+                      </span>
+                    </div>
+                    {adminInboxMessages.length === 0 ? (
+                      <p className="mt-4 text-sm text-white/60">
+                        No messages from users yet. Members can reach you through their home inbox.
+                      </p>
+                    ) : (
+                      <ul className="mt-4 space-y-3">
+                        {adminInboxMessages.map((message) => {
+                          const senderIdValue =
+                            typeof message.senderId === 'object' && message.senderId !== null
+                              ? message.senderId._id || message.senderId.id || ''
+                              : message.senderId || ''
+                          const senderName =
+                            message.senderId?.username || message.senderName || 'Community member'
+                          return (
+                            <li
+                              key={message._id || message.id}
+                              className={`rounded-2xl border px-3 py-3 text-sm transition ${
+                                selectedConversation?.userId === senderIdValue
+                                  ? 'border-white/40 bg-white/10'
+                                  : 'border-white/10 bg-white/0 hover:border-white/20 hover:bg-white/5'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2 text-xs text-white/60">
+                                <span className="font-semibold text-white">{senderName}</span>
+                                <span>{formatDate(message.createdAt)}</span>
+                              </div>
+                              <p className="mt-2 text-white/80 line-clamp-2">{message.content}</p>
+                              <div className="mt-3 flex items-center justify-between">
+                                <button
+                                  type="button"
+                                  onClick={() => void openConversation(senderIdValue, senderName)}
+                                  className="text-xs font-semibold text-white/80 transition hover:text-white"
+                                >
+                                  View conversation →
+                                </button>
+                                {!message.isRead && (
+                                  <span className="inline-flex items-center rounded-full bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-200">
+                                    Unread
+                                  </span>
+                                )}
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-white shadow-lg shadow-slate-900/40 backdrop-blur">
+                    <div className="flex items-center justify-between text-sm">
+                      <h4 className="font-semibold text-white">
+                        {selectedConversation ? selectedConversation.username : 'Select a conversation'}
+                      </h4>
+                      {selectedConversation && (
+                        <span className="text-xs text-white/60">
+                          {selectedConversation.messages.length} message
+                          {selectedConversation.messages.length === 1 ? '' : 's'}
+                        </span>
+                      )}
+                    </div>
+                    {conversationError && (
+                      <div className="mt-4 rounded-2xl border border-rose-300/40 bg-rose-500/10 px-4 py-2 text-xs text-rose-100">
+                        {conversationError}
+                      </div>
+                    )}
+                    {conversationLoading ? (
+                      <div className="flex min-h-[200px] items-center justify-center text-white/70">
+                        Loading conversation…
+                      </div>
+                    ) : selectedConversation ? (
+                      <>
+                        <div className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-2">
+                          {selectedConversation.messages.map((message) => {
+                            const isMember = message.senderId === selectedConversation.userId
+                            return (
+                              <div
+                                key={message.id}
+                                className={`flex ${isMember ? 'justify-start' : 'justify-end'}`}
+                              >
+                                <div
+                                  className={`max-w-[85%] rounded-2xl border px-4 py-3 text-sm ${
+                                    isMember
+                                      ? 'border-white/10 bg-white/10 text-white'
+                                      : 'border-emerald-400/30 bg-emerald-500/20 text-emerald-50'
+                                  }`}
+                                >
+                                  <div className="text-xs font-semibold">
+                                    {isMember ? selectedConversation.username : 'Admin team'}
+                                  </div>
+                                  <p className="mt-1 whitespace-pre-line text-white/90">
+                                    {message.content}
+                                  </p>
+                                  <p className="mt-2 text-[11px] text-white/60">
+                                    {formatDate(message.createdAt)}
+                                  </p>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        <form onSubmit={handleConversationReply} className="mt-4 space-y-2">
+                          <label className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">
+                            Quick reply
+                          </label>
+                          <textarea
+                            value={conversationReply}
+                            onChange={(event) => setConversationReply(event.target.value)}
+                            rows={3}
+                            placeholder={`Reply to ${selectedConversation.username}…`}
+                            className="w-full rounded-2xl border border-white/20 bg-slate-950/40 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-300/40"
+                          />
+                          <div className="flex justify-end">
+                            <button
+                              type="submit"
+                              disabled={replySending || !conversationReply.trim()}
+                              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-red-500 via-rose-500 to-orange-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-rose-500/40 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {replySending ? 'Sending…' : 'Send reply'}
+                            </button>
+                          </div>
+                        </form>
+                      </>
+                    ) : (
+                      <p className="mt-4 text-sm text-white/60">
+                        Select a member from the list to view the conversation history and respond.
+                      </p>
+                    )}
+                  </div>
+                </div>
 
                 <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-slate-900/40 backdrop-blur">
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1876,42 +2086,6 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                             <span>{formatDate(message.createdAt)}</span>
                           </div>
                           <p className="mt-2 text-sm text-white/80">{message.content}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-slate-900/40 backdrop-blur">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h4 className="text-lg font-semibold text-white">Messages from Users</h4>
-                    <span className="text-xs text-white/60">
-                      Showing {Math.min(adminInboxMessages.length, 8)} of {adminInboxMessages.length}
-                    </span>
-                  </div>
-                  {adminInboxMessages.length === 0 ? (
-                    <p className="mt-4 text-sm text-white/60">
-                      No messages from users yet. Users can message you through their inbox.
-                    </p>
-                  ) : (
-                    <ul className="mt-4 space-y-3">
-                      {adminInboxMessages.slice(0, 8).map((message) => (
-                        <li
-                          key={message._id || message.id}
-                          className="rounded-2xl border border-white/10 bg-white/5 p-3 text-white/80"
-                        >
-                          <div className="flex items-center justify-between text-xs text-white/60">
-                            <span>
-                              {message.senderId?.username || message.senderName || 'Community member'}
-                            </span>
-                            <span>{formatDate(message.createdAt)}</span>
-                          </div>
-                          <p className="mt-2 text-sm text-white/80">{message.content}</p>
-                          {!message.isRead && (
-                            <span className="mt-2 inline-block rounded-full bg-amber-500/20 px-2 py-1 text-xs font-semibold text-amber-300">
-                              Unread
-                            </span>
-                          )}
                         </li>
                       ))}
                     </ul>
