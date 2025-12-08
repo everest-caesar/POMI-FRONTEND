@@ -14,6 +14,7 @@ interface BusinessFormData {
 interface BusinessUploadProps {
   onSuccess?: () => void
   onCancel?: () => void
+  authToken?: string
 }
 
 const CATEGORIES = [
@@ -28,7 +29,7 @@ const CATEGORIES = [
   { value: 'other', label: 'Other' },
 ]
 
-export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadProps) {
+export default function BusinessUpload({ onSuccess, onCancel, authToken }: BusinessUploadProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -48,6 +49,15 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const token = authService.getToken()
+  const buildHeaders = (additionalHeaders: Record<string, string> = {}) => {
+    if (authToken) {
+      return { ...additionalHeaders, Authorization: `Bearer ${authToken}` }
+    }
+    if (token) {
+      return { ...additionalHeaders, Authorization: `Bearer ${token}` }
+    }
+    return additionalHeaders
+  }
   const fieldBaseClass =
     'w-full rounded-lg border border-white/25 bg-white text-gray-900 placeholder:text-gray-500 px-4 py-2 text-sm shadow-inner focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100'
 
@@ -90,7 +100,8 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
         '/businesses',
         {
           ...formData,
-        }
+        },
+        { headers: buildHeaders() }
       )
 
       const newBusinessId = createResponse.data.business._id
@@ -128,9 +139,9 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
       })
 
       await axiosInstance.post(`/businesses/${id}/images`, uploadFormData, {
-        headers: {
+        headers: buildHeaders({
           'Content-Type': 'multipart/form-data',
-        },
+        }),
       })
 
       setSuccess(`Business created and images uploaded successfully! Click "Publish Now" to make it visible in the directory.`)
@@ -148,7 +159,8 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
     try {
       await axiosInstance.put(
         `/businesses/${businessId}`,
-        { status: 'active' }
+        { status: 'active' },
+        { headers: buildHeaders() }
       )
 
       setSuccess(`Business published successfully! It's now visible in the directory.`)
@@ -303,6 +315,7 @@ export default function BusinessUpload({ onSuccess, onCancel }: BusinessUploadPr
               <p className="text-sm font-semibold text-white">Click to upload or drag and drop</p>
               <p className="text-xs text-white/60">PNG, JPG, or WebP (max 10MB each)</p>
             </button>
+            <p className="mt-2 text-xs text-white/60">Attach up to 10 photos so members can see every detail.</p>
 
             {/* Image Previews */}
             {filePreviews.length > 0 && (

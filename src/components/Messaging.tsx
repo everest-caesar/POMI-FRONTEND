@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import axiosInstance from '../utils/axios';
 import socketService from '../services/socketService';
 import { generateClientMessageId } from '../utils/messageHelpers';
@@ -55,8 +55,22 @@ const formatPrice = (value?: number) => {
   }).format(value);
 };
 
+const formatRelativeTime = (value?: string | Date | null) => {
+  if (!value) return '';
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (!date || Number.isNaN(date.getTime())) {
+    return '';
+  }
+  const diff = Date.now() - date.getTime();
+  if (diff < 60_000) return 'just now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
 export default function Messaging({ currentUserId, currentUserName }: MessagingProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversationQuery, setConversationQuery] = useState('');
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState('');
@@ -76,6 +90,21 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const activeConversationIdRef = useRef<string | null>(null);
+  const filteredConversations = useMemo(() => {
+    const query = conversationQuery.trim().toLowerCase();
+    if (!query) {
+      return conversations;
+    }
+
+    return conversations.filter((conversation) => {
+      const haystackName = conversation.userName?.toLowerCase() || '';
+      const haystackMessage = conversation.lastMessage?.toLowerCase() || '';
+      return (
+        haystackName.includes(query) ||
+        haystackMessage.includes(query)
+      );
+    });
+  }, [conversationQuery, conversations]);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -341,6 +370,10 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
     );
   };
 
+  const handleConversationRefresh = () => {
+    void fetchConversations();
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -485,16 +518,52 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
     <div className="flex gap-6 h-[520px] lg:h-[600px] bg-white rounded-3xl border border-gray-100 shadow-xl">
       {/* Conversations List */}
       <div className="w-80 border-r border-gray-100 flex flex-col">
-        <div className="p-4 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900">Messages</h2>
-          <p className="text-xs text-gray-500">Direct conversations</p>
-          {conversationsError && (
-            <p className="mt-2 text-xs text-red-600">{conversationsError}</p>
-          )}
+        <div className="p-4 border-b border-gray-100 space-y-3">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Messages</h2>
+            <p className="text-xs text-gray-500">Direct conversations</p>
+            {conversationsError && (
+              <p className="mt-2 text-xs text-red-600">{conversationsError}</p>
+            )}
+          </div>
+          <div>
+            <label className="text-[11px] uppercase tracking-[0.3em] text-gray-400">
+              Search inbox
+            </label>
+            <div className="mt-1 relative">
+              <input
+                value={conversationQuery}
+                onChange={(event) => setConversationQuery(event.target.value)}
+                placeholder="Find a neighbour or listing"
+                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100"
+              />
+              {conversationQuery && (
+                <button
+                  type="button"
+                  onClick={() => setConversationQuery('')}
+                  className="absolute inset-y-0 right-0 px-3 text-xs text-gray-400 hover:text-gray-600"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <span>
+              Showing {filteredConversations.length} of {conversations.length} chats
+            </span>
+            <button
+              type="button"
+              onClick={handleConversationRefresh}
+              className="rounded-full border border-gray-200 px-3 py-1 text-[11px] font-semibold text-gray-600 hover:text-gray-900"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {conversations.map((conversation) => (
+          {filteredConversations.map((conversation) => (
             <button
               key={conversation.userId}
               onClick={() => void handleSelectConversation(conversation)}
@@ -526,18 +595,32 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
                       Listing inquiry
                     </p>
                   )}
-                  <p className="text-xs text-gray-400 mt-1">
-                    {new Date(conversation.lastMessageTime).toLocaleDateString()}
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    {formatRelativeTime(conversation.lastMessageTime)}
                   </p>
                 </div>
-                {conversation.unreadCount > 0 && (
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white text-xs font-bold">
-                    {conversation.unreadCount}
+                <div className="flex flex-col items-end gap-1">
+                  {conversation.unreadCount > 0 && (
+                    <span className="inline-flex items-center justify-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-600">
+                      {conversation.unreadCount}
+                    </span>
+                  )}
+                  <span className="text-[10px] text-gray-400">
+                    {conversation.lastMessageTime
+                      ? new Date(conversation.lastMessageTime).toLocaleDateString()
+                      : ''}
                   </span>
-                )}
+                </div>
               </div>
             </button>
           ))}
+          {!filteredConversations.length && (
+            <div className="p-6 text-center text-sm text-gray-400">
+              {conversationQuery.trim()
+                ? `No conversations match “${conversationQuery.trim()}”.`
+                : 'Start a chat by messaging a listing or community member.'}
+            </div>
+          )}
         </div>
       </div>
 
@@ -546,16 +629,30 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
         {selectedConversation ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-gray-900">{selectedConversation.userName}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {selectedConversation.userName}
+                  </h3>
+                  <span
+                    className={`text-xs font-semibold ${
+                      isUserOnline ? 'text-emerald-600' : 'text-gray-400'
+                    }`}
+                  >
+                    ● {isUserOnline ? 'Online now' : 'Offline'}
+                  </span>
+                </div>
                 <p className="text-xs text-gray-500">
-                  {isUserOnline ? (
-                    <span className="text-emerald-600">● Online</span>
-                  ) : (
-                    <span className="text-gray-400">● Offline</span>
-                  )}
+                  Last active {formatRelativeTime(selectedConversation.lastMessageTime)}
                 </p>
+              </div>
+              <div className="text-right">
+                {selectedConversation.hasListing && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                    🛍️ Listing chat
+                  </span>
+                )}
               </div>
             </div>
 
@@ -689,6 +786,9 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
                   Send 🚀
                 </button>
               </div>
+              <p className="mt-2 text-xs text-gray-400">
+                Heads-up: recipients also get a short email alert so they never miss your note.
+              </p>
             </form>
           </>
         ) : (

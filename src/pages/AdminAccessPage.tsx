@@ -2,27 +2,40 @@ import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import authService, { User } from '../services/authService'
 import AdminPortal from '../components/AdminPortal'
+import { API_BASE_URL } from '../config/api'
 
 const gradientBg =
-  'bg-gradient-to-br from-slate-900 via-zinc-900 to-slate-800 text-white min-h-screen flex flex-col'
+  'bg-gradient-to-br from-rose-50 via-white to-amber-50 text-slate-900 min-h-screen flex flex-col'
 
 const ADMIN_SUPPORT_EMAIL = 'support@pomi.community'
+const ADMIN_TOKEN_KEY = 'adminAuthToken'
+const ADMIN_USER_KEY = 'adminUserData'
 
 export default function AdminAccessPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [currentUser, setCurrentUser] = useState<User | null>(authService.getUserData())
-  const [showPortal, setShowPortal] = useState(
-    Boolean(authService.isAuthenticated() && currentUser?.isAdmin)
-  )
+  const [adminToken, setAdminToken] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem(ADMIN_TOKEN_KEY)
+  })
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const stored = localStorage.getItem(ADMIN_USER_KEY)
+      return stored ? (JSON.parse(stored) as User) : null
+    } catch {
+      return null
+    }
+  })
+  const [showPortal, setShowPortal] = useState(Boolean(adminToken && currentUser?.isAdmin))
 
   const [loginForm, setLoginForm] = useState({
     email: '',
     password: '',
   })
 
-  const token = useMemo(() => authService.getToken(), [showPortal, currentUser])
+  const token = useMemo(() => adminToken, [adminToken])
   const trustSignals = [
     {
       icon: '🔐',
@@ -72,26 +85,39 @@ export default function AdminAccessPage() {
   ]
 
   useEffect(() => {
-    if (!authService.isAuthenticated()) {
+    if (!adminToken) {
       setCurrentUser(null)
+      setShowPortal(false)
       return
     }
 
-    authService
-      .getCurrentUser()
-      .then((response) => {
-        setCurrentUser(response.user)
-        if (response.user.isAdmin) {
-          setShowPortal(true)
+    const controller = new AbortController()
+
+    fetch(`${API_BASE_URL}/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+      },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error('Session expired')
         }
+        const data = await response.json()
+        setCurrentUser(data.user)
+        setShowPortal(Boolean(data.user?.isAdmin))
+        localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(data.user))
       })
       .catch(() => {
-        authService.removeToken()
-        authService.clearUserData()
+        localStorage.removeItem(ADMIN_TOKEN_KEY)
+        localStorage.removeItem(ADMIN_USER_KEY)
+        setAdminToken(null)
         setCurrentUser(null)
         setShowPortal(false)
       })
-  }, [])
+
+    return () => controller.abort()
+  }, [adminToken])
 
   const resetMessages = () => {
     setError(null)
@@ -99,8 +125,9 @@ export default function AdminAccessPage() {
   }
 
   const handleLogout = () => {
-    authService.removeToken()
-    authService.clearUserData()
+    localStorage.removeItem(ADMIN_TOKEN_KEY)
+    localStorage.removeItem(ADMIN_USER_KEY)
+    setAdminToken(null)
     setCurrentUser(null)
     setShowPortal(false)
     setSuccess('You have been signed out of the admin console.')
@@ -116,15 +143,17 @@ export default function AdminAccessPage() {
         email: loginForm.email.trim(),
         password: loginForm.password,
       })
-      authService.setToken(response.token)
-      localStorage.setItem('userData', JSON.stringify(response.user))
+      localStorage.setItem(ADMIN_TOKEN_KEY, response.token)
+      localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(response.user))
+      setAdminToken(response.token)
       setCurrentUser(response.user)
       if (!response.user.isAdmin) {
         setError(
           'Access denied. Only the designated admin credential can open the console. Please contact the community lead if you need assistance.'
         )
-        authService.removeToken()
-        authService.clearUserData()
+        localStorage.removeItem(ADMIN_TOKEN_KEY)
+        localStorage.removeItem(ADMIN_USER_KEY)
+        setAdminToken(null)
         setCurrentUser(null)
         return
       }
@@ -160,19 +189,19 @@ export default function AdminAccessPage() {
         <div className="absolute -left-12 top-6 h-60 w-60 rounded-full bg-rose-500/25 blur-3xl" />
         <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-orange-500/15 blur-3xl" />
       </div>
-      <header className="relative border-b border-white/10 bg-white/5 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-5 text-white">
+      <header className="relative border-b border-slate-200/70 bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-5 text-slate-900">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold transition hover:bg-white/20"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white"
           >
             ← Back to Pomi
           </Link>
-          <div className="text-xs text-white/70">
+          <div className="text-xs text-slate-500">
             Operations desk:{' '}
             <a
               href={`mailto:${ADMIN_SUPPORT_EMAIL}`}
-              className="font-semibold text-white underline decoration-rose-300/60 underline-offset-4"
+              className="font-semibold text-rose-600 underline decoration-rose-200 underline-offset-4"
             >
               {ADMIN_SUPPORT_EMAIL}
             </a>
@@ -180,17 +209,17 @@ export default function AdminAccessPage() {
         </div>
       </header>
 
-      <main className="relative mx-auto flex-1 px-6 py-12 text-white">
+      <main className="relative mx-auto flex-1 px-6 py-12 text-slate-900">
         <div className="mx-auto grid w-full max-w-6xl gap-8 lg:grid-cols-[1.15fr,0.85fr]">
-          <section className="space-y-8 rounded-[32px] border border-white/10 bg-white/10 p-8 shadow-2xl backdrop-blur">
+          <section className="space-y-8 rounded-[32px] border border-slate-200 bg-white/95 p-8 shadow-2xl">
             <div>
-              <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.4em] text-rose-200">
+              <p className="inline-flex items-center gap-2 rounded-full border border-rose-100 bg-rose-50 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.4em] text-rose-500">
                 Admin cockpit • Trusted access only
               </p>
               <h1 className="mt-4 text-3xl font-black md:text-4xl">
                 Professional-grade console for Pomi operations.
               </h1>
-              <p className="mt-3 text-sm text-white/80 md:text-base">
+              <p className="mt-3 text-sm text-slate-600 md:text-base">
                 Approvals, escalations, and community broadcasts are all handled within this secure
                 interface. The credential is distributed via the operations handbook and rotates every
                 quarter—or sooner if a security incident occurs.
@@ -201,29 +230,29 @@ export default function AdminAccessPage() {
               {trustSignals.map((item) => (
                 <div
                   key={item.title}
-                  className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-white/80 shadow-lg shadow-slate-900/40"
+                  className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-lg shadow-slate-200"
                 >
                   <div className="text-2xl">{item.icon}</div>
-                  <p className="mt-3 text-base font-semibold text-white">{item.title}</p>
-                  <p className="mt-2 text-xs leading-relaxed">{item.body}</p>
+                  <p className="mt-3 text-base font-semibold text-slate-900">{item.title}</p>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-600">{item.body}</p>
                 </div>
               ))}
             </div>
 
-            <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-slate-900/40">
-              <p className="text-xs font-semibold uppercase tracking-[0.4em] text-white/50">
+            <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200">
+              <p className="text-xs font-semibold uppercase tracking-[0.4em] text-slate-500">
                 Operations rhythm
               </p>
               <div className="space-y-4">
                 {continuityTimeline.map((item) => (
                   <div
                     key={item.step}
-                    className="flex gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+                    className="flex gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
                   >
-                    <div className="text-2xl font-black text-white/60">{item.step}</div>
+                    <div className="text-2xl font-black text-slate-400">{item.step}</div>
                     <div>
-                      <p className="text-sm font-semibold text-white">{item.title}</p>
-                      <p className="text-xs text-white/70">{item.detail}</p>
+                      <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                      <p className="text-xs text-slate-600">{item.detail}</p>
                     </div>
                   </div>
                 ))}
@@ -307,11 +336,11 @@ export default function AdminAccessPage() {
               </form>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-xl backdrop-blur">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-white/60">
+            <div className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-xl">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-600">
                 Security reminders
               </h3>
-              <ul className="mt-4 space-y-3 text-sm text-white/80">
+              <ul className="mt-4 space-y-3 text-sm text-slate-600">
                 {securityChecklist.map((item) => (
                   <li key={item} className="flex items-start gap-3">
                     <span className="text-lg">✔️</span>

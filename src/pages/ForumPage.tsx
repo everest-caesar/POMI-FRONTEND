@@ -18,6 +18,7 @@ interface ForumPost {
   repliesCount?: number
   viewsCount?: number
   upvotes?: number
+  votes?: number
   createdAt: string
 }
 
@@ -254,6 +255,13 @@ export default function ForumPage() {
     return sorted
   }, [posts, activeCommunity, searchTerm, selectedSort])
 
+  const calculateThreadScore = (post: ForumPost) => {
+    const replies = post.repliesCount || 0
+    const views = post.viewsCount || 0
+    const votes = post.upvotes ?? post.votes ?? 0
+    return replies * 3 + votes * 5 + views
+  }
+
   const trendingCommunities = useMemo(() => {
     const counts = posts.reduce(
       (map, post) => map.set(post.category, (map.get(post.category) || 0) + 1),
@@ -271,13 +279,11 @@ export default function ForumPage() {
   const trendingThreads = useMemo(() => {
     if (activeCommunity === 'all') return []
 
-    // Get posts from the active community only
-    const communityPosts = posts.filter(post => post.category === activeCommunity)
-
-    // Sort by upvotes to show trending threads
-    return communityPosts
-      .sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0))
-      .slice(0, 5)
+    const communityPosts = posts.filter((post) => post.category === activeCommunity)
+    const sorted = [...communityPosts].sort(
+      (a, b) => calculateThreadScore(b) - calculateThreadScore(a)
+    )
+    return sorted.slice(0, 5)
   }, [posts, activeCommunity])
 
   const activeFilterBadges = useMemo(() => {
@@ -301,6 +307,21 @@ export default function ForumPage() {
 
     return badges
   }, [activeCommunity, searchTerm, selectedSort])
+
+  const activeCommunityMeta = useMemo(() => {
+    if (activeCommunity === 'all') {
+      return {
+        label: 'All communities',
+        description: 'See every conversation in one stream.',
+      }
+    }
+
+    const match = COMMUNITY_CONFIG.find((community) => community.id === activeCommunity)
+    return {
+      label: match?.label ?? 'Community threads',
+      description: match?.description ?? '',
+    }
+  }, [activeCommunity])
 
   const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -519,6 +540,12 @@ export default function ForumPage() {
                 </button>
               </div>
             )}
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70 shadow-inner shadow-slate-900/40">
+              <span className="font-semibold text-white">{activeCommunityMeta.label}</span>
+              {activeCommunityMeta.description && (
+                <span className="ml-2 text-white/60">{activeCommunityMeta.description}</span>
+              )}
+            </div>
           </div>
 
           {!loading && !error && (
@@ -615,44 +642,59 @@ export default function ForumPage() {
                 trendingCommunities.map((community, index) => (
                   <li
                     key={community.id}
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
+                    className="w-full"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg font-bold text-white/50">{index + 1}</span>
-                      <div>
-                        <p className="font-semibold text-white">
-                          {community.badge} {community.label}
-                        </p>
-                        <p className="text-xs text-white/60">{community.description}</p>
+                    <button
+                      type="button"
+                      onClick={() => setActiveCommunity(community.id)}
+                      className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-3 py-2 text-left transition ${
+                        activeCommunity === community.id
+                          ? 'border-white/20 bg-white/10'
+                          : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg font-bold text-white/50">{index + 1}</span>
+                        <div>
+                          <p className="font-semibold text-white">
+                            {community.badge} {community.label}
+                          </p>
+                          <p className="text-xs text-white/60">{community.description}</p>
+                        </div>
                       </div>
-                    </div>
-                    <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/60">
-                      {community.total} threads
-                    </span>
+                      <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/60">
+                        {community.total} threads
+                      </span>
+                    </button>
                   </li>
                 ))
               ) : (
                 trendingThreads.length > 0 ? (
-                  trendingThreads.map((thread, index) => (
-                    <li
-                      key={thread._id}
-                      className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10 transition"
-                      onClick={() => navigate(`/forums/${thread._id}`)}
-                    >
-                      <div className="flex items-start gap-2">
-                        <span className="text-sm font-bold text-white/50">{index + 1}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-white text-sm line-clamp-2">
-                            {thread.title}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-white/60">
-                            <span>⬆️ {thread.upvotes || 0}</span>
-                            <span>💬 {thread.repliesCount || 0}</span>
-                          </div>
+                trendingThreads.map((thread, index) => (
+                  <li
+                    key={thread._id}
+                    className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10 transition"
+                    onClick={() => navigate(`/forums/${thread._id}`)}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className="text-sm font-bold text-white/50">{index + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-white text-sm line-clamp-2">
+                          {thread.title}
+                        </p>
+                        <p className="mt-1 text-xs text-white/60 line-clamp-2">
+                          {thread.content.slice(0, 140)}
+                          {thread.content.length > 140 ? '…' : ''}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2 text-xs text-white/60">
+                          <span>⬆️ {thread.upvotes ?? thread.votes ?? 0}</span>
+                          <span>💬 {thread.repliesCount || 0}</span>
+                          <span>👀 {thread.viewsCount || 0}</span>
                         </div>
                       </div>
-                    </li>
-                  ))
+                    </div>
+                  </li>
+                ))
                 ) : (
                   <li className="text-white/50 text-sm py-4 text-center">
                     No threads yet in this community
@@ -681,7 +723,8 @@ export default function ForumPage() {
           <div className="relative w-full max-w-3xl rounded-[32px] border border-white/10 bg-white/95 p-8 text-slate-900 shadow-2xl">
             <button
               onClick={() => setShowComposer(false)}
-              className="absolute right-4 top-4 rounded-full bg-red-500 hover:bg-red-600 px-3 py-1 text-lg text-white font-bold transition shadow-lg shadow-red-500/50 ring-2 ring-red-200"
+              className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-rose-600 text-2xl font-bold shadow-lg shadow-rose-200 ring-2 ring-rose-200 transition hover:-translate-y-0.5"
+              aria-label="Close composer"
             >
               ×
             </button>

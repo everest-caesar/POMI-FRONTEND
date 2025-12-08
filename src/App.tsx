@@ -1,10 +1,11 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import './App.css'
 import authService, { User as AuthUser } from './services/authService'
 import Events from './components/Events'
 import EnhancedAuthForm from './components/EnhancedAuthForm'
 import FeatureCarousel from './components/FeatureCarousel'
+import { API_BASE_URL } from './config/api'
 
 type FeatureId =
   | 'events'
@@ -53,7 +54,7 @@ const BASE_FEATURES: FeatureCard[] = [
     icon: '🏢',
     title: 'Business Directory',
     description:
-      'Spotlight Habesha-owned businesses in Ottawa and make it easy to support local.',
+      'Spotlight Habesha-owned businesses wherever we are and make it easy to support local.',
     gradient: 'bg-gradient-to-br from-amber-400 via-yellow-400 to-rose-400',
     borderColor: 'border-yellow-200',
   },
@@ -235,6 +236,46 @@ function App() {
     }
   }, [unreadAdminMessages])
 
+  const fetchAdminMessages = useCallback(async () => {
+    const token = authService.getToken()
+    if (!token) {
+      setAdminMessages([])
+      setUnreadAdminMessages(0)
+      return
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/messages/admin/inbox`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to load admin messages')
+      }
+
+      const result = await response.json()
+      const messages = Array.isArray(result.data) ? result.data : []
+
+      const formattedMessages: AdminMessage[] = messages.map((msg: any) => ({
+        id: msg.id || msg._id,
+        sender: msg.isAdminMessage ? 'admin' : 'member',
+        body: msg.content,
+        createdAt: msg.createdAt,
+        read: msg.isAdminMessage ? Boolean(msg.isRead) : true,
+      }))
+
+      setAdminMessages(formattedMessages)
+      const unreadCount = messages.filter(
+        (msg: any) => msg.isAdminMessage && !msg.isRead
+      ).length
+      setUnreadAdminMessages(unreadCount)
+    } catch (error) {
+      console.error('Failed to fetch admin messages:', error)
+    }
+  }, [])
+
   useEffect(() => {
     if ((location.state as any)?.requireAuth) {
       setAuthMode('login')
@@ -296,10 +337,16 @@ function App() {
     }
 
     const fetchUnreadCount = async () => {
+      const token = authService.getToken()
+      if (!token) {
+        setUnreadMessagesCount(0)
+        return
+      }
+
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1'}/messages/unread/count`, {
+        const response = await fetch(`${API_BASE_URL}/messages/unread/count`, {
           headers: {
-            'Authorization': `Bearer ${authService.getToken()}`,
+            Authorization: `Bearer ${token}`,
           },
         })
 
@@ -326,45 +373,12 @@ function App() {
       return
     }
 
-    const fetchAdminMessages = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1'}/messages/admin/inbox`, {
-          headers: {
-            'Authorization': `Bearer ${authService.getToken()}`,
-          },
-        })
+    void fetchAdminMessages()
 
-        if (response.ok) {
-          const result = await response.json()
-          const messages = result.data || []
-
-          // Convert backend messages to frontend format
-          const formattedMessages: AdminMessage[] = messages.map((msg: any) => ({
-            id: msg._id || msg.id,
-            sender: 'admin',
-            body: msg.content,
-            createdAt: msg.createdAt,
-            read: msg.isRead,
-          }))
-
-          setAdminMessages(formattedMessages)
-
-          // Count unread admin messages
-          const unreadCount = formattedMessages.filter(msg => !msg.read).length
-          setUnreadAdminMessages(unreadCount)
-        }
-      } catch (error) {
-        console.error('Failed to fetch admin messages:', error)
-      }
-    }
-
-    fetchAdminMessages()
-
-    // Refresh admin messages every 60 seconds
     const interval = setInterval(fetchAdminMessages, 60000)
 
     return () => clearInterval(interval)
-  }, [isLoggedIn])
+  }, [isLoggedIn, fetchAdminMessages])
 
   const handleAuthSuccess = (user: AuthUser) => {
     setCurrentUser(user)
@@ -412,12 +426,19 @@ function App() {
       return
     }
 
+    const token = authService.getToken()
+    if (!token) {
+      setAuthMode('login')
+      setShowAuthModal(true)
+      return
+    }
+
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1'}/messages/admin/reply`, {
+      const response = await fetch(`${API_BASE_URL}/messages/admin/reply`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authService.getToken()}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           content: messageDraft.trim(),
@@ -425,20 +446,14 @@ function App() {
       })
 
       if (response.ok) {
-        const newMessage: AdminMessage = {
-          id: `member-${Date.now()}`,
-          sender: 'member',
-          body: messageDraft.trim(),
-          createdAt: new Date().toISOString(),
-          read: true,
-        }
-
-        setAdminMessages((prev) => [...prev, newMessage])
         setInboxFilter('sent')
         setMessageDraft('')
         triggerFlash('Message sent to admin team')
+        await fetchAdminMessages()
       } else {
-        triggerFlash('Failed to send message. Please try again.')
+        const errorPayload = await response.json().catch(() => ({}))
+        const message = errorPayload?.error || 'Failed to send message. Please try again.'
+        triggerFlash(message)
       }
     } catch (error) {
       console.error('Failed to send message to admin:', error)
@@ -453,6 +468,7 @@ function App() {
       return
     }
     setInboxFilter('updates')
+    void fetchAdminMessages()
     setShowAdminInbox(true)
   }
 
@@ -495,7 +511,7 @@ function App() {
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.4em] text-white/60">Pomi Community Hub</p>
-              <p className="text-lg font-black text-white">Ottawa</p>
+              <p className="text-lg font-black text-white">Member access</p>
             </div>
           </Link>
 
@@ -524,13 +540,14 @@ function App() {
             </button>
             <button
               onClick={handleOpenAdminInbox}
-              className="relative inline-flex items-center gap-2 rounded-full border-2 border-amber-400/60 bg-gradient-to-r from-amber-500/20 to-orange-500/20 px-4 py-2 text-sm font-semibold text-white transition hover:border-amber-300 hover:from-amber-500/30 hover:to-orange-500/30 shadow-lg shadow-amber-500/20"
+              className="relative inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-rose-600 shadow-lg shadow-rose-500/30 ring-2 ring-rose-100 transition hover:-translate-y-0.5"
               aria-label={isLoggedIn ? 'Open messages from the admin team' : 'Log in to see admin messages'}
             >
-              <span className="text-lg">💬</span>
-              <span>Admin</span>
+              <span className="text-lg">📣</span>
+              <span className="hidden sm:inline">Admin updates</span>
+              <span className="sm:hidden">Admin</span>
               {unreadAdminMessages > 0 && (
-                <span className="absolute -right-2 -top-2 flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 px-1.5 text-xs font-bold text-white shadow-lg shadow-red-500/60 ring-2 ring-white/20 animate-pulse">
+                <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-rose-600 px-1.5 text-xs font-bold text-white shadow-lg shadow-red-500/60 ring-2 ring-white/40 animate-pulse">
                   {unreadAdminMessages > 9 ? '9+' : unreadAdminMessages}
                 </span>
               )}
@@ -599,13 +616,13 @@ function App() {
           <div className="mx-auto grid max-w-7xl items-center gap-12 rounded-[40px] border border-white/10 bg-white/5 p-10 shadow-[0_40px_80px_rgba(15,23,42,0.35)] backdrop-blur-xl lg:grid-cols-[1.5fr,1fr]">
             <div className="space-y-6">
               <div className="inline-flex items-center gap-3 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-white/70">
-                <span className="text-base">🌍</span> Ottawa • Habesha Community
+                <span className="text-base">🌍</span> Habesha Community • Worldwide
               </div>
               <h1 className="text-4xl font-black leading-tight text-white md:text-5xl lg:text-6xl">
                 One digital home for culture, opportunity, and connection.
               </h1>
               <p className="max-w-2xl text-lg text-white/80 md:text-xl">
-                Pomi brings together marketplace listings, cultural events, forums, faith circles, and a full business directory—designed with love for our Habesha community in Ottawa.
+                Pomi brings together marketplace listings, cultural events, forums, faith circles, and a full business directory—designed with love for our Habesha community everywhere we live.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
@@ -782,7 +799,7 @@ function App() {
                   Ready to unlock opportunity, culture, and community in one home?
                 </h2>
                 <p className="max-w-2xl text-base text-white/90">
-                  Join thousands of neighbours who already share resources, co-create events, and keep Ottawa’s Habesha community thriving. It takes less than two minutes to create your profile.
+                  Join thousands of neighbours who already share resources, co-create events, and keep the Habesha community thriving. It takes less than two minutes to create your profile.
                 </p>
               </div>
               <div className="flex flex-col gap-3 rounded-3xl border border-white/20 bg-white/10 p-6 text-sm text-white/80 shadow-lg shadow-rose-500/40 backdrop-blur-lg">
@@ -825,7 +842,7 @@ function App() {
               </div>
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-white/60">Pomi Community Hub</p>
-                <p className="text-lg font-black text-white">Ottawa</p>
+              <p className="text-lg font-black text-white">Community</p>
               </div>
             </div>
             <p className="text-sm text-white/60">
@@ -871,7 +888,7 @@ function App() {
             <ul className="mt-4 space-y-2 text-sm text-white/70">
               <li>Email: support@pomi.community</li>
               <li>Instagram: @pomi.community</li>
-              <li>Facebook: Pomi Ottawa Network</li>
+              <li>Facebook: Pomi Community Network</li>
               <li>LinkedIn: Pomi Community Hub</li>
             </ul>
           </div>
@@ -887,7 +904,8 @@ function App() {
           <div className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/90 p-8 shadow-[0_30px_60px_rgba(15,23,42,0.6)]">
             <button
               onClick={() => setActiveFeature(null)}
-              className="absolute right-4 top-4 rounded-full bg-red-500/90 hover:bg-red-600 px-3 py-1 text-lg text-white font-bold transition shadow-lg shadow-red-500/50 ring-2 ring-white/20"
+              className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-rose-600 text-2xl font-bold shadow-lg shadow-rose-500/30 ring-2 ring-rose-100 transition hover:-translate-y-0.5"
+              aria-label="Close feature spotlight"
             >
               ×
             </button>
@@ -945,7 +963,7 @@ function App() {
           <div className="relative w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/90 p-8 shadow-[0_30px_60px_rgba(15,23,42,0.65)]">
             <button
               onClick={() => setShowCalendarModal(false)}
-              className="absolute right-4 top-4 rounded-full bg-red-500/90 hover:bg-red-600 px-3 py-1 text-lg text-white font-bold transition shadow-lg shadow-red-500/50 ring-2 ring-white/20"
+              className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-rose-600 text-2xl font-bold shadow-lg shadow-rose-500/30 ring-2 ring-rose-100 transition hover:-translate-y-0.5"
               aria-label="Close Ethiopian calendar highlights"
             >
               ×
@@ -993,7 +1011,7 @@ function App() {
           <div className="relative w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/95 p-8 shadow-[0_30px_60px_rgba(15,23,42,0.65)]">
             <button
               onClick={() => setShowAdminInbox(false)}
-              className="absolute right-4 top-4 rounded-full bg-red-500/90 hover:bg-red-600 px-3 py-1 text-lg text-white font-bold transition shadow-lg shadow-red-500/50 ring-2 ring-white/20"
+              className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-rose-600 text-2xl font-bold shadow-lg shadow-rose-500/30 ring-2 ring-rose-100 transition hover:-translate-y-0.5"
               aria-label="Close admin messages"
             >
               ×
@@ -1119,7 +1137,8 @@ function App() {
           <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-gray-200 bg-white p-8 shadow-[0_30px_60px_rgba(0,0,0,0.15)]">
             <button
               onClick={() => setShowAuthModal(false)}
-              className="absolute right-4 top-4 rounded-full bg-red-500 hover:bg-red-600 px-3 py-1 text-lg text-white font-bold transition shadow-lg shadow-red-500/50 ring-2 ring-red-200"
+              className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-rose-600 text-2xl font-bold shadow-lg shadow-rose-200 ring-2 ring-rose-100 transition hover:-translate-y-0.5"
+              aria-label="Close authentication modal"
             >
               ×
             </button>
