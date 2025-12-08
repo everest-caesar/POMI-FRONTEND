@@ -132,6 +132,8 @@ const createEmptySectionErrors = (): SectionErrors => ({
   messages: null,
 })
 
+type AdminSection = 'overview' | 'marketplace' | 'events' | 'businesses' | 'members' | 'messaging'
+
 const getErrorMessage = (reason: unknown): string => {
   if (reason instanceof Error) return reason.message
   if (typeof reason === 'string') return reason
@@ -216,6 +218,8 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
   const [members, setMembers] = useState<CommunityMember[]>([])
   const [adminMessages, setAdminMessages] = useState<AdminMessage[]>([])
   const [adminInboxMessages, setAdminInboxMessages] = useState<any[]>([])
+  const [unreadUserMessages, setUnreadUserMessages] = useState(0)
+  const [activeSection, setActiveSection] = useState<AdminSection>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sectionErrors, setSectionErrors] = useState<SectionErrors>(
@@ -363,9 +367,14 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
       }
 
       if (inboxResult.status === 'fulfilled') {
-        setAdminInboxMessages(inboxResult.value.data || [])
+        const inboxMessages = inboxResult.value.data || []
+        setAdminInboxMessages(inboxMessages)
+        setUnreadUserMessages(
+          inboxMessages.filter((message: any) => !message.isRead).length,
+        )
       } else {
         setAdminInboxMessages([])
+        setUnreadUserMessages(0)
       }
 
       setLastUpdatedAt(new Date())
@@ -411,11 +420,28 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
     await refreshMembers()
   }
 
+  const refreshAdminInbox = async () => {
+    try {
+      const response = await fetchAdminInboxData()
+      const inboxMessages = response.data || []
+      setAdminInboxMessages(inboxMessages)
+      setUnreadUserMessages(
+        inboxMessages.filter((message: any) => !message.isRead).length,
+      )
+    } catch (err: any) {
+      setSectionErrors((prev) => ({
+        ...prev,
+        messages: err.message || 'Failed to load admin messages',
+      }))
+    }
+  }
+
   const refreshAdminMessagesList = async () => {
     try {
       const response = await fetchAdminMessagesData()
       setAdminMessages(mapAdminMessages(response.data || []))
       setSectionErrors((prev) => ({ ...prev, messages: null }))
+      await refreshAdminInbox()
     } catch (err: any) {
       setSectionErrors((prev) => ({
         ...prev,
@@ -503,14 +529,6 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
     loadAdminData()
   }, [token])
 
-  const scrollToSection = (anchorId: string) => {
-    if (typeof document === 'undefined') return
-    const element = document.getElementById(anchorId)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }
-
   const handleDownloadSnapshot = () => {
     try {
       setDownloadingSnapshot(true)
@@ -547,13 +565,13 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
   }
 
   const jumpToEvents = () => {
+    setActiveSection('events')
     setShowEventCreation(true)
-    scrollToSection('admin-events')
   }
 
   const jumpToBusinesses = () => {
+    setActiveSection('businesses')
     setShowBusinessUpload(true)
-    scrollToSection('admin-businesses')
   }
 
   const handleUpdateBusiness = async (
@@ -707,15 +725,6 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
 
   const lastUpdatedLabel = formatRelativeTimestamp(lastUpdatedAt)
 
-  const navigationSections = [
-    { id: 'admin-overview', label: 'Overview' },
-    { id: 'admin-marketplace', label: 'Marketplace' },
-    { id: 'admin-events', label: 'Events' },
-    { id: 'admin-businesses', label: 'Businesses' },
-    { id: 'admin-members', label: 'Members' },
-    { id: 'admin-messaging', label: 'Messaging' },
-  ]
-
   const quickActions = [
     {
       title: loading ? 'Refreshing data…' : 'Refresh console',
@@ -726,7 +735,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
     },
     {
       title: 'New event review',
-      description: 'Open the composer to spotlight official gatherings.',
+      description: 'Jump to approvals and open the event composer.',
       icon: '🎟️',
       action: jumpToEvents,
     },
@@ -745,6 +754,45 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
     },
   ]
 
+  const adminSections = [
+    {
+      id: 'overview',
+      label: 'Overview',
+      icon: '📊',
+      description: 'Executive metrics & quick actions.',
+    },
+    {
+      id: 'marketplace',
+      label: 'Marketplace',
+      icon: '🛒',
+      description: 'Approve listings & monitor status.',
+    },
+    {
+      id: 'events',
+      label: 'Events',
+      icon: '🎉',
+      description: 'Review RSVPs and moderation status.',
+    },
+    {
+      id: 'businesses',
+      label: 'Businesses',
+      icon: '🏢',
+      description: 'Create, verify, and publish business listings.',
+    },
+    {
+      id: 'members',
+      label: 'Members',
+      icon: '👥',
+      description: 'Search profiles and manage community roles.',
+    },
+    {
+      id: 'messaging',
+      label: 'Messaging',
+      icon: '💬',
+      description: 'Broadcast announcements and reply to members.',
+    },
+  ] as const
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/95 backdrop-blur supports-[backdrop-filter]:bg-slate-950/70">
@@ -758,9 +806,9 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                 Community safety & marketplace intelligence
               </h1>
               <p className="max-w-2xl text-sm text-white/70 md:text-base">
-                One dashboard to approve listings, issue announcements, and keep the Ottawa Habesha
-                community curated. Every action is logged—use the controls below to jump to the queues
-                that need attention first.
+                One dashboard to approve listings, issue announcements, and keep the Habesha community
+                curated wherever members live. Every action is logged—use the controls below to jump to
+                the queues that need attention first.
               </p>
               <div className="flex flex-wrap items-center gap-3 text-xs text-white/60">
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1">
@@ -769,6 +817,22 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1">
                   <span className="text-white/80">📬 Pending approvals:</span> {pendingApprovals}
                 </span>
+                <button
+                  onClick={() => {
+                    setActiveSection('messaging')
+                    void refreshAdminInbox()
+                  }}
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold transition ${
+                    unreadUserMessages > 0
+                      ? 'bg-rose-500/20 text-rose-100 border border-rose-300/40 shadow-lg shadow-rose-900/20'
+                      : 'border border-white/15 text-white/70 hover:border-white/25 hover:text-white'
+                  }`}
+                >
+                  <span>📨 Member inbox</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white">
+                    {unreadUserMessages > 0 ? `${unreadUserMessages} new` : 'All clear'}
+                  </span>
+                </button>
               </div>
             </div>
             <div className="flex flex-shrink-0 flex-wrap items-center gap-3">
@@ -789,32 +853,28 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {quickActions.map((action) => (
-              <button
-                key={action.title}
-                onClick={action.action}
-                disabled={action.disabled}
-                className="flex flex-col items-start rounded-3xl border border-white/10 bg-white/5 px-5 py-4 text-left shadow-lg shadow-slate-900/30 transition hover:-translate-y-1 hover:border-white/30 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                <span className="text-2xl">{action.icon}</span>
-                <p className="mt-3 text-sm font-semibold text-white">{action.title}</p>
-                <p className="mt-1 text-xs text-white/70">{action.description}</p>
-              </button>
-            ))}
-          </div>
         </div>
       </header>
       <div className="border-b border-white/10 bg-slate-950/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <nav className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-white/60">
-            {navigationSections.map((section) => (
+          <nav className="flex flex-wrap gap-2">
+            {adminSections.map((section) => (
               <button
                 key={section.id}
-                onClick={() => scrollToSection(section.id)}
-                className="rounded-full border border-white/15 px-3 py-1 text-white/70 transition hover:border-white/40 hover:text-white"
+                onClick={() => setActiveSection(section.id)}
+                className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-left text-sm font-semibold transition ${
+                  activeSection === section.id
+                    ? 'border-white/30 bg-white/10 text-white shadow-lg shadow-slate-900/30'
+                    : 'border-white/10 bg-white/5 text-white/70 hover:border-white/20 hover:text-white'
+                }`}
               >
-                {section.label}
+                <span>{section.icon}</span>
+                <span>{section.label}</span>
+                {section.id === 'messaging' && unreadUserMessages > 0 && (
+                  <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-xs font-bold text-rose-100">
+                    {unreadUserMessages}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -848,76 +908,93 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
 
         {!loading && !error && (
           <div className="space-y-12">
-            {/* Metrics Overview */}
-            <section id="admin-overview">
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-black text-white">Executive snapshot</h2>
-                  <p className="text-sm text-white/60">
-                    Key health metrics across the marketplace, events, and business directory.
-                  </p>
+            {activeSection === 'overview' && (
+              <>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  {quickActions.map((action) => (
+                    <button
+                      key={action.title}
+                      onClick={action.action}
+                      disabled={action.disabled}
+                      className="flex flex-col items-start rounded-3xl border border-white/10 bg-white/5 px-5 py-4 text-left shadow-lg shadow-slate-900/30 transition hover:-translate-y-1 hover:border-white/30 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      <span className="text-2xl">{action.icon}</span>
+                      <p className="mt-3 text-sm font-semibold text-white">{action.title}</p>
+                      <p className="mt-1 text-xs text-white/70">{action.description}</p>
+                    </button>
+                  ))}
                 </div>
-              </div>
-              {statusMessage && (
-                <div className="mb-4 rounded-3xl border border-emerald-300/40 bg-emerald-500/10 px-6 py-4 text-sm font-semibold text-emerald-200 shadow-lg shadow-emerald-900/30 backdrop-blur">
-                  {statusMessage}
-                </div>
-              )}
+                <section className="space-y-6">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-black text-white">Executive snapshot</h2>
+                      <p className="text-sm text-white/60">
+                        Key health metrics across the marketplace, events, and business directory.
+                      </p>
+                    </div>
+                  </div>
+                  {statusMessage && (
+                    <div className="rounded-3xl border border-emerald-300/40 bg-emerald-500/10 px-6 py-4 text-sm font-semibold text-emerald-200 shadow-lg shadow-emerald-900/30 backdrop-blur">
+                      {statusMessage}
+                    </div>
+                  )}
 
-              {sectionErrors.overview ? (
-                <div className="rounded-3xl border border-rose-300/40 bg-rose-500/10 px-6 py-4 text-sm text-rose-100">
-                  {sectionErrors.overview}
-                </div>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7">
-                  <SummaryCard
-                    title="Community Members"
-                    value={metrics?.totalUsers ?? 0}
-                    icon="👥"
-                    accent="from-red-500 to-orange-500"
-                  />
-                  <SummaryCard
-                    title="Active Events"
-                    value={metrics?.totalEvents ?? 0}
-                    icon="🎉"
-                    accent="from-orange-500 to-amber-500"
-                  />
-                  <SummaryCard
-                    title="Business Listings"
-                    value={metrics?.totalBusinesses ?? 0}
-                    icon="🏢"
-                    accent="from-amber-500 to-yellow-500"
-                  />
-                  <SummaryCard
-                    title="Total RSVPs"
-                    value={metrics?.totalRegistrations ?? 0}
-                    icon="📝"
-                    accent="from-emerald-500 to-teal-500"
-                  />
-                  <SummaryCard
-                    title="Pending Businesses"
-                    value={metrics?.pendingBusinesses ?? 0}
-                    icon="⏳"
-                    accent="from-blue-500 to-indigo-500"
-                  />
-                  <SummaryCard
-                    title="Pending Events"
-                    value={metrics?.pendingEvents ?? 0}
-                    icon="🕒"
-                    accent="from-purple-500 to-violet-500"
-                  />
-                  <SummaryCard
-                    title="Pending Listings"
-                    value={metrics?.pendingListings ?? 0}
-                    icon="🛒"
-                    accent="from-fuchsia-500 to-pink-500"
-                  />
-                </div>
-              )}
-            </section>
+                  {sectionErrors.overview ? (
+                    <div className="rounded-3xl border border-rose-300/40 bg-rose-500/10 px-6 py-4 text-sm text-rose-100">
+                      {sectionErrors.overview}
+                    </div>
+                  ) : (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7">
+                      <SummaryCard
+                        title="Community Members"
+                        value={metrics?.totalUsers ?? 0}
+                        icon="👥"
+                        accent="from-red-500 to-orange-500"
+                      />
+                      <SummaryCard
+                        title="Active Events"
+                        value={metrics?.totalEvents ?? 0}
+                        icon="🎉"
+                        accent="from-orange-500 to-amber-500"
+                      />
+                      <SummaryCard
+                        title="Business Listings"
+                        value={metrics?.totalBusinesses ?? 0}
+                        icon="🏢"
+                        accent="from-amber-500 to-yellow-500"
+                      />
+                      <SummaryCard
+                        title="Total RSVPs"
+                        value={metrics?.totalRegistrations ?? 0}
+                        icon="📝"
+                        accent="from-emerald-500 to-teal-500"
+                      />
+                      <SummaryCard
+                        title="Pending Businesses"
+                        value={metrics?.pendingBusinesses ?? 0}
+                        icon="⏳"
+                        accent="from-blue-500 to-indigo-500"
+                      />
+                      <SummaryCard
+                        title="Pending Events"
+                        value={metrics?.pendingEvents ?? 0}
+                        icon="🕒"
+                        accent="from-purple-500 to-violet-500"
+                      />
+                      <SummaryCard
+                        title="Pending Listings"
+                        value={metrics?.pendingListings ?? 0}
+                        icon="🛒"
+                        accent="from-fuchsia-500 to-pink-500"
+                      />
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
 
-              {/* Marketplace Moderation */}
-              <section id="admin-marketplace" className="space-y-4">
+            {activeSection === 'marketplace' && (
+              <section className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h3 className="flex items-center gap-2 text-xl font-black text-white">
@@ -1054,9 +1131,10 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                   </div>
                 )}
               </section>
+            )}
 
-              {/* Events Overview */}
-              <section id="admin-events" className="space-y-4">
+            {activeSection === 'events' && (
+              <section className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h3 className="flex items-center gap-2 text-xl font-black text-white">
@@ -1338,9 +1416,10 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                   </div>
                 )}
               </section>
+            )}
 
-              {/* Business Management */}
-              <section id="admin-businesses" className="space-y-4">
+            {activeSection === 'businesses' && (
+              <section className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h3 className="flex items-center gap-2 text-xl font-black text-white">
@@ -1472,9 +1551,10 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                   </div>
                 )}
               </section>
+            )}
 
-              {/* Community Members */}
-              <section id="admin-members" className="space-y-4">
+            {activeSection === 'members' && (
+              <section className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h3 className="flex items-center gap-2 text-xl font-black text-white">
@@ -1569,9 +1649,10 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                   </div>
                 )}
               </section>
+            )}
 
-              {/* Admin Messaging */}
-              <section id="admin-messaging" className="space-y-5">
+            {activeSection === 'messaging' && (
+              <section className="space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h3 className="flex items-center gap-2 text-xl font-black text-white">
@@ -1764,6 +1845,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                   )}
                 </div>
               </section>
+            )}
             </div>
           )}
         </main>
