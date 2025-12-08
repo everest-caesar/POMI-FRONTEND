@@ -463,7 +463,7 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
     setConversationLoading(true)
     setConversationError(null)
     try {
-      const response = await fetch(`${API_BASE_URL}/messages/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/admin/messages/conversation/${userId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
