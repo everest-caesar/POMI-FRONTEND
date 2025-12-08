@@ -794,105 +794,178 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
   ] as const
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/95 backdrop-blur supports-[backdrop-filter]:bg-slate-950/70">
-        <div className="mx-auto max-w-7xl space-y-6 px-6 py-6">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div className="space-y-3">
-              <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-white/70">
-                Pomi Admin • Private
-              </p>
-              <h1 className="text-2xl font-black text-white md:text-3xl">
-                Community safety & marketplace intelligence
-              </h1>
-              <p className="max-w-2xl text-sm text-white/70 md:text-base">
-                One dashboard to approve listings, issue announcements, and keep the Habesha community
-                curated wherever members live. Every action is logged—use the controls below to jump to
-                the queues that need attention first.
-              </p>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-white/60">
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1">
-                  <span className="text-white/80">⏱️ Last sync:</span> {lastUpdatedLabel}
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1">
-                  <span className="text-white/80">📬 Pending approvals:</span> {pendingApprovals}
-                </span>
-                <button
-                  onClick={() => {
-                    setActiveSection('messaging')
-                    void refreshAdminInbox()
-                  }}
-                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold transition ${
-                    unreadUserMessages > 0
-                      ? 'bg-rose-500/20 text-rose-100 border border-rose-300/40 shadow-lg shadow-rose-900/20'
-                      : 'border border-white/15 text-white/70 hover:border-white/25 hover:text-white'
-                  }`}
-                >
-                  <span>📨 Member inbox</span>
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white">
-                    {unreadUserMessages > 0 ? `${unreadUserMessages} new` : 'All clear'}
+    <div className="flex min-h-screen bg-slate-950 text-slate-100">
+      <aside className="hidden w-64 flex-col border-r border-white/10 bg-slate-900/80 px-4 py-6 lg:flex">
+        <div className="flex items-center gap-3 px-2">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 via-rose-500 to-orange-500 text-2xl font-black text-white shadow-lg shadow-red-500/40">
+            P
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/60">
+              Admin Console
+            </p>
+            <p className="text-sm font-semibold text-white">Pomi Community</p>
+          </div>
+        </div>
+        <nav className="mt-8 flex flex-col gap-2">
+          {adminSections.map((section) => (
+            <button
+              key={section.id}
+              onClick={() => setActiveSection(section.id)}
+              className={`rounded-2xl border px-3 py-3 text-left transition ${
+                activeSection === section.id
+                  ? 'border-white/25 bg-white/10 text-white shadow-lg shadow-slate-900/30'
+                  : 'border-transparent text-white/70 hover:border-white/10 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-white">
+                    {section.icon} {section.label}
+                  </p>
+                  <p className="text-xs text-white/60">{section.description}</p>
+                </div>
+                {section.id === 'messaging' && unreadUserMessages > 0 && (
+                  <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[11px] font-semibold text-rose-100">
+                    {unreadUserMessages}
                   </span>
+                )}
+              </div>
+            </button>
+          ))}
+        </nav>
+        <div className="mt-auto space-y-3 border-t border-white/10 pt-4">
+          <button
+            onClick={() => {
+              setActiveSection('messaging')
+              void refreshAdminInbox()
+            }}
+            className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-sm font-semibold transition ${
+              unreadUserMessages > 0
+                ? 'bg-rose-500/20 text-rose-100 border border-rose-300/40 shadow-lg shadow-rose-900/20'
+                : 'border border-white/15 text-white/70 hover:border-white/25 hover:text-white'
+            }`}
+          >
+            <span>📨 Member inbox</span>
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white">
+              {unreadUserMessages > 0 ? `${unreadUserMessages} new` : 'All clear'}
+            </span>
+          </button>
+          <div className="flex flex-wrap gap-2">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="flex flex-1 items-center justify-center rounded-2xl border border-white/20 px-3 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white"
+              >
+                ← Back
+              </button>
+            )}
+            <button
+              onClick={onLogout}
+              className="flex flex-1 items-center justify-center rounded-2xl bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-red-500/40 transition hover:-translate-y-0.5"
+            >
+              Log out
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <div className="flex flex-1 flex-col">
+        <header className="border-b border-white/10 bg-slate-900/60 px-4 py-4 backdrop-blur sm:px-6 lg:px-10">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/60">
+                  Pomi Admin • Private
+                </p>
+                <h1 className="text-2xl font-black text-white">
+                  Community safety & marketplace intelligence
+                </h1>
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/60">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-3 py-1">
+                    ⏱️ Last sync: {lastUpdatedLabel}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-3 py-1">
+                    📬 Pending approvals: {pendingApprovals}
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex min-w-[200px] items-center rounded-2xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/70">
+                  <span className="mr-2 text-white/50">🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Search workspace"
+                    className="w-full bg-transparent text-sm text-white placeholder:text-white/50 focus:outline-none"
+                  />
+                </label>
+                <button
+                  onClick={loadAdminData}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  ↻ Refresh
                 </button>
               </div>
             </div>
-            <div className="flex flex-shrink-0 flex-wrap items-center gap-3">
-              {onBack && (
-                <button
-                  onClick={onBack}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white"
-                >
-                  ← Back
-                </button>
-              )}
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-white/60">
               <button
-                onClick={onLogout}
-                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-red-500/40 transition hover:-translate-y-0.5"
+                onClick={() => {
+                  setActiveSection('messaging')
+                  void refreshAdminInbox()
+                }}
+                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold transition ${
+                  unreadUserMessages > 0
+                    ? 'bg-rose-500/20 text-rose-100 border border-rose-300/40 shadow-lg shadow-rose-900/20'
+                    : 'border border-white/15 text-white/70 hover:border-white/25 hover:text-white'
+                }`}
               >
-                Log out
+                <span>📨 Member inbox</span>
+                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white">
+                  {unreadUserMessages > 0 ? `${unreadUserMessages} new` : 'All clear'}
+                </span>
               </button>
+              <div className="flex gap-2">
+                {onBack && (
+                  <button
+                    onClick={onBack}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white lg:hidden"
+                  >
+                    ← Back
+                  </button>
+                )}
+                <button
+                  onClick={onLogout}
+                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-red-500/40 transition hover:-translate-y-0.5 lg:hidden"
+                >
+                  Log out
+                </button>
+              </div>
             </div>
           </div>
+        </header>
 
-        </div>
-      </header>
-      <div className="border-b border-white/10 bg-slate-950/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <nav className="flex flex-wrap gap-2">
+        <div className="border-b border-white/10 bg-slate-950/90 px-4 py-3 lg:hidden">
+          <div className="flex gap-2 overflow-x-auto">
             {adminSections.map((section) => (
               <button
-                key={section.id}
+                key={`mobile-${section.id}`}
                 onClick={() => setActiveSection(section.id)}
-                className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-left text-sm font-semibold transition ${
+                className={`flex flex-col rounded-2xl px-3 py-2 text-left text-xs font-semibold transition ${
                   activeSection === section.id
-                    ? 'border-white/30 bg-white/10 text-white shadow-lg shadow-slate-900/30'
-                    : 'border-white/10 bg-white/5 text-white/70 hover:border-white/20 hover:text-white'
+                    ? 'border border-white/20 bg-white/10 text-white'
+                    : 'border border-white/5 bg-transparent text-white/60'
                 }`}
               >
                 <span>{section.icon}</span>
                 <span>{section.label}</span>
-                {section.id === 'messaging' && unreadUserMessages > 0 && (
-                  <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-xs font-bold text-rose-100">
-                    {unreadUserMessages}
-                  </span>
-                )}
               </button>
             ))}
-          </nav>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-white/60">
-            <span className="rounded-full border border-white/15 px-3 py-1">
-              Events queue: {metrics?.pendingEvents ?? 0}
-            </span>
-            <span className="rounded-full border border-white/15 px-3 py-1">
-              Listings queue: {metrics?.pendingListings ?? 0}
-            </span>
-            <span className="rounded-full border border-white/15 px-3 py-1">
-              Businesses queue: {metrics?.pendingBusinesses ?? 0}
-            </span>
           </div>
         </div>
-      </div>
 
-      <main className="mx-auto max-w-7xl space-y-12 px-6 py-10">
+        <main className="flex-1 bg-slate-950 px-4 py-8 sm:px-6 lg:px-10">
+
         {loading && (
           <div className="py-24 text-center text-white/70">
             <div className="mb-6 text-5xl animate-spin">🌀</div>
@@ -1846,11 +1919,12 @@ export default function AdminPortal({ token, onLogout, onBack }: AdminPortalProp
                 </div>
               </section>
             )}
-            </div>
-          )}
+          </div>
+        )}
         </main>
+      </div>
     </div>
-  );
+  )
 }
 
 interface SummaryCardProps {
