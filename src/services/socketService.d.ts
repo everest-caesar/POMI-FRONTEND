@@ -13,7 +13,7 @@ declare class SocketService {
     /**
      * Send a message via Socket.io
      */
-    sendMessage(recipientId: string, content: string, listingId?: string): void;
+    sendMessage(recipientId: string, content: string, listingId?: string, clientMessageId?: string): void;
     /**
      * Start typing indicator
      */

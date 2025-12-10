@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axiosInstance from '../utils/axios';
 import authService from '../services/authService';
 const CATEGORY_DISPLAY_MAP = {
@@ -16,12 +16,19 @@ const CATEGORY_DISPLAY_MAP = {
 };
 const ADMIN_CONTACT_EMAIL = 'marakihay@gmail.com';
 export default function BusinessDirectoryPage() {
+    const navigate = useNavigate();
     const currentUser = authService.getUserData();
     const isAdmin = Boolean(currentUser?.isAdmin);
     const [businesses, setBusinesses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [activeSector, setActiveSector] = useState('All');
+    // Redirect admins to admin portal
+    useEffect(() => {
+        if (isAdmin) {
+            navigate('/admin', { replace: true });
+        }
+    }, [isAdmin, navigate]);
     // Fetch businesses on mount
     useEffect(() => {
         const fetchBusinesses = async () => {

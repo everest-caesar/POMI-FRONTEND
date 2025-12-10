@@ -1,0 +1,8 @@
+"use client";
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
+export function ConversationItem({ username, message, type, time, date, isOnline = false, isActive = false, onClick, }) {
+    return (_jsxs("button", { onClick: onClick, className: cn("w-full flex items-start gap-3 p-4 rounded-xl transition-all duration-200 text-left", "hover:bg-secondary/80", isActive && "bg-secondary ring-1 ring-primary/20"), children: [_jsxs("div", { className: "relative", children: [_jsx(Avatar, { className: "h-11 w-11 ring-2 ring-border", children: _jsx(AvatarFallback, { className: "bg-secondary text-foreground font-medium", children: username.charAt(0).toUpperCase() }) }), isOnline && _jsx("span", { className: "absolute bottom-0 right-0 h-3 w-3 rounded-full bg-success ring-2 ring-card" })] }), _jsxs("div", { className: "flex-1 min-w-0", children: [_jsxs("div", { className: "flex items-center justify-between gap-2 mb-1", children: [_jsx("span", { className: "font-semibold text-foreground truncate", children: username }), _jsx("span", { className: "text-xs text-muted-foreground whitespace-nowrap", children: date })] }), _jsx("p", { className: "text-sm text-muted-foreground truncate mb-1.5", children: message }), _jsxs("div", { className: "flex items-center justify-between", children: [_jsx("span", { className: "text-xs font-medium text-primary", children: type }), _jsx("span", { className: "text-xs text-muted-foreground", children: time })] })] })] }));
+}
+//# sourceMappingURL=conversation-item.js.map

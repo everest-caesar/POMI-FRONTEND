@@ -24,7 +24,11 @@
     "declarationMap": true,
     "sourceMap": true,
     "jsx": "react-jsx",
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["*"]
+    }
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]

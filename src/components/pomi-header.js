@@ -1,0 +1,9 @@
+"use client";
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+export function PomiHeader({ title, backHref = "/", backLabel = "Back", username = "tennysonkalio" }) {
+    return (_jsx("header", { className: "sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60", children: _jsxs("div", { className: "flex h-16 items-center justify-between px-6", children: [_jsxs("div", { className: "flex items-center gap-4", children: [_jsx(Link, { to: backHref, children: _jsxs(Button, { variant: "ghost", size: "sm", className: "gap-2 text-muted-foreground hover:text-foreground", children: [_jsx(ArrowLeft, { className: "h-4 w-4" }), backLabel] }) }), _jsxs("div", { className: "flex items-center gap-3", children: [_jsx("div", { className: "flex h-10 w-10 items-center justify-center rounded-xl bg-primary", children: _jsx("span", { className: "text-lg font-bold text-primary-foreground", children: "P" }) }), _jsxs("div", { className: "flex flex-col", children: [_jsx("span", { className: "text-xs font-medium tracking-widest text-muted-foreground", children: "POMI" }), _jsx("span", { className: "text-sm font-semibold text-foreground", children: title })] })] })] }), _jsxs("div", { className: "flex items-center gap-4", children: [_jsxs("span", { className: "text-sm text-muted-foreground", children: ["Welcome, ", _jsx("span", { className: "font-medium text-foreground", children: username })] }), _jsx(Button, { variant: "secondary", size: "sm", className: "font-medium", children: "Sign out" })] })] }) }));
+}
+//# sourceMappingURL=pomi-header.js.map

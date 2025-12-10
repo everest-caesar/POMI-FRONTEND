@@ -7,8 +7,8 @@ interface RegisterRequest {
     password: string;
     username: string;
     age: number;
-    area: string;
-    workOrSchool: string;
+    area?: string;
+    workOrSchool?: string;
     adminInviteCode?: string;
 }
 interface AuthResponse {

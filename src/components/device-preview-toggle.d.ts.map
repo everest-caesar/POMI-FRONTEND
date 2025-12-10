@@ -1,0 +1,1 @@
+{"version":3,"file":"device-preview-toggle.d.ts","sourceRoot":"","sources":["device-preview-toggle.tsx"],"names":[],"mappings":"AAEA,OAAO,EAAuC,KAAK,SAAS,EAAE,MAAM,OAAO,CAAA;AAG3E,KAAK,UAAU,GAAG,SAAS,GAAG,QAAQ,CAAA;AAUtC,eAAO,MAAM,aAAa;gBAPZ,UAAU;mBACP,CAAC,IAAI,EAAE,UAAU,KAAK,IAAI;CAMiB,CAAA;AAE5D,wBAAgB,mBAAmB,CAAC,EAAE,QAAQ,EAAE,EAAE;IAAE,QAAQ,EAAE,SAAS,CAAA;CAAE,2CAgExE"}
