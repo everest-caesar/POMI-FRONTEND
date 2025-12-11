@@ -38,6 +38,7 @@ export type BusinessProfile = {
   description: string
   location: string
   phone: string
+  email?: string
   website?: string | null
   rating: number
   reviews: number
@@ -46,6 +47,13 @@ export type BusinessProfile = {
   hours?: string
   tags?: string[]
   testimonials?: Review[]
+}
+
+export type ForumReply = {
+  id: number
+  author: string
+  message: string
+  createdAt: string
 }
 
 export type Review = {
@@ -68,6 +76,9 @@ export type ForumThread = {
   excerpt: string
   status: 'open' | 'resolved'
   tags?: string[]
+  body?: string
+  views?: number
+  responses?: ForumReply[]
 }
 
 export type MessageThread = {
@@ -276,6 +287,7 @@ const businessDirectory: BusinessProfile[] = [
     description: 'Authentic Ethiopian cuisine with traditional coffee ceremony. Family-owned since 2015.',
     location: '123 Bank Street, Ottawa',
     phone: '(613) 555-0123',
+    email: 'hello@habeshaottawa.ca',
     website: 'habeshaottawa.ca',
     rating: 4.8,
     reviews: 156,

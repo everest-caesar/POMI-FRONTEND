@@ -36,6 +36,7 @@ export type BusinessProfile = {
     description: string;
     location: string;
     phone: string;
+    email?: string;
     website?: string | null;
     rating: number;
     reviews: number;
@@ -44,6 +45,12 @@ export type BusinessProfile = {
     hours?: string;
     tags?: string[];
     testimonials?: Review[];
+};
+export type ForumReply = {
+    id: number;
+    author: string;
+    message: string;
+    createdAt: string;
 };
 export type Review = {
     id: number;
@@ -64,6 +71,9 @@ export type ForumThread = {
     excerpt: string;
     status: 'open' | 'resolved';
     tags?: string[];
+    body?: string;
+    views?: number;
+    responses?: ForumReply[];
 };
 export type MessageThread = {
     id: number;

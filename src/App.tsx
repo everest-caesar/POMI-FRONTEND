@@ -293,7 +293,7 @@ function App() {
     if (!token) return
 
     try {
-      const response = await fetch(`${API_BASE_URL}/messages/admin`, {
+      const response = await fetch(`${API_BASE_URL}/messages/admin/reply`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -503,10 +503,10 @@ function App() {
                 <textarea
                   value={messageDraft}
                   onChange={(event) => setMessageDraft(event.target.value)}
-                  className="min-h-[120px] w-full rounded-2xl border border-white/15 bg-white p-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-300/30 disabled:bg-slate-200 disabled:text-slate-500"
+                  className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-300/30 disabled:bg-slate-200 disabled:text-slate-500 selection:bg-rose-100 selection:text-slate-900"
                   placeholder={
                     isLoggedIn
-                      ? 'Selam! I have a question about…'
+                      ? 'Selam! I have a question about...'
                       : 'Log in to message the admin team.'
                   }
                   disabled={!isLoggedIn}

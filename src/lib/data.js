@@ -191,6 +191,7 @@ const businessDirectory = [
         description: 'Authentic Ethiopian cuisine with traditional coffee ceremony. Family-owned since 2015.',
         location: '123 Bank Street, Ottawa',
         phone: '(613) 555-0123',
+        email: 'hello@habeshaottawa.ca',
         website: 'habeshaottawa.ca',
         rating: 4.8,
         reviews: 156,

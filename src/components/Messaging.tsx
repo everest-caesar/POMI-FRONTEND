@@ -535,7 +535,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
                 value={conversationQuery}
                 onChange={(event) => setConversationQuery(event.target.value)}
                 placeholder="Find a neighbour or listing"
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100 selection:bg-rose-100 selection:text-gray-900"
               />
               {conversationQuery && (
                 <button
@@ -775,7 +775,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
                   value={messageInput}
                   onChange={handleTyping}
                   placeholder="Type a message..."
-                  className="flex-1 rounded-2xl border border-gray-200 px-4 py-2 text-sm shadow-inner focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100 resize-none"
+                  className="flex-1 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100 resize-none selection:bg-red-100 selection:text-gray-900"
                   rows={3}
                 />
                 <button
