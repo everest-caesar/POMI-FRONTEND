@@ -256,7 +256,9 @@ export function HomeLanding({
               onClick={handleMessagesClick}
             >
               <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline">Messages</span>
+              <span className="hidden sm:inline">
+                Messages{isLoggedIn && unreadMessagesCount > 0 ? ` (${unreadMessagesCount})` : ''}
+              </span>
               {isLoggedIn && unreadMessagesCount > 0 && (
                 <span className="ml-1 rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold">
                   {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
@@ -270,7 +272,7 @@ export function HomeLanding({
               onClick={handleAdminClick}
             >
               <ShieldCheck className="h-4 w-4" />
-              <span className="hidden sm:inline">Admin</span>
+              <span className="hidden sm:inline">Support centre</span>
               {isLoggedIn && unreadAdminMessages > 0 && (
                 <span className="ml-1 rounded-full bg-emerald-500 px-1.5 text-[11px] font-semibold">
                   {unreadAdminMessages > 9 ? '9+' : unreadAdminMessages}
@@ -337,10 +339,10 @@ export function HomeLanding({
             </nav>
             <div className="mt-4 flex flex-col gap-2">
               <Button variant="ghost" className="justify-start text-slate-300" onClick={handleMessagesClick}>
-                Messages
+                Messages{isLoggedIn && unreadMessagesCount > 0 ? ` (${unreadMessagesCount})` : ''}
               </Button>
               <Button variant="ghost" className="justify-start text-slate-300" onClick={handleAdminClick}>
-                Admin updates
+                Support centre
               </Button>
               <Button variant="ghost" className="justify-start text-slate-300" onClick={onCalendarClick}>
                 Calendar
@@ -765,7 +767,15 @@ export function HomeLanding({
             <div>
               <h4 className="mb-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Resources</h4>
               <ul className="space-y-2 text-sm text-slate-400">
-                <li>Support centre</li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={onAdminInboxClick}
+                    className="text-sm text-slate-400 hover:text-white transition-colors"
+                  >
+                    Support centre
+                  </button>
+                </li>
                 <li>Guides for newcomers</li>
                 <li>Community standards</li>
                 <li>Privacy & safety</li>

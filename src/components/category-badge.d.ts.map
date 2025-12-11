@@ -1,0 +1,1 @@
+{"version":3,"file":"category-badge.d.ts","sourceRoot":"","sources":["category-badge.tsx"],"names":[],"mappings":"AAIA,UAAU,kBAAkB;IAC1B,IAAI,EAAE,MAAM,CAAA;IACZ,KAAK,EAAE,MAAM,CAAA;IACb,QAAQ,CAAC,EAAE,OAAO,CAAA;IAClB,OAAO,CAAC,EAAE,MAAM,IAAI,CAAA;CACrB;AAED,wBAAgB,aAAa,CAAC,EAAE,IAAI,EAAE,KAAK,EAAE,QAAgB,EAAE,OAAO,EAAE,EAAE,kBAAkB,2CAe3F"}

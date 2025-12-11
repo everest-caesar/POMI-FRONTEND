@@ -1,0 +1,5 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+export function TrendingCommunity({ rank, icon, name, description, threadCount }) {
+    return (_jsxs("div", { className: "flex items-center gap-4 p-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors duration-200 cursor-pointer", children: [_jsx("span", { className: "flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-sm font-bold text-muted-foreground", children: rank }), _jsxs("div", { className: "flex-1 min-w-0", children: [_jsxs("div", { className: "flex items-center gap-2 mb-1", children: [_jsx("span", { className: "text-base", children: icon }), _jsx("span", { className: "font-semibold text-foreground truncate", children: name })] }), _jsx("p", { className: "text-xs text-muted-foreground truncate", children: description })] }), _jsxs("div", { className: "flex flex-col items-end", children: [_jsx("span", { className: "text-sm font-bold text-foreground", children: threadCount }), _jsx("span", { className: "text-xs text-muted-foreground", children: "threads" })] })] }));
+}
+//# sourceMappingURL=trending-community.js.map

@@ -217,6 +217,15 @@ function App() {
         const interval = setInterval(fetchUnreadCount, 30000);
         return () => clearInterval(interval);
     }, [isLoggedIn]);
+    const handleExploreFeature = (feature) => {
+        const routes = {
+            events: '/events',
+            marketplace: '/marketplace',
+            business: '/business',
+            forums: '/forums',
+        };
+        navigate(routes[feature]);
+    };
     const handleLogout = () => {
         authService.removeToken();
         authService.clearUserData();
@@ -225,8 +234,8 @@ function App() {
         setAdminMessages([]);
         setUnreadAdminMessages(0);
         setUnreadMessagesCount(0);
+        triggerFlash('You have been logged out.');
         navigate('/');
-        triggerFlash('You have been logged out');
     };
     const handleOpenAdminInbox = () => {
         if (!isLoggedIn) {
@@ -234,21 +243,18 @@ function App() {
             setShowAuthModal(true);
             return;
         }
-        setInboxFilter('updates');
         fetchAdminMessages();
         setShowAdminInbox(true);
     };
-    const handleSendMessageToAdmin = async (event) => {
-        event.preventDefault();
-        if (!messageDraft.trim())
+    const handleSendMessageToAdmin = async (e) => {
+        e.preventDefault();
+        if (!messageDraft.trim() || !isLoggedIn)
             return;
         const token = authService.getToken();
-        if (!token) {
-            triggerFlash('Please log in to send a message');
+        if (!token)
             return;
-        }
         try {
-            const response = await fetch(`${API_BASE_URL}/messages/admin/reply`, {
+            const response = await fetch(`${API_BASE_URL}/messages/admin`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -259,40 +265,30 @@ function App() {
             if (!response.ok) {
                 throw new Error('Failed to send message');
             }
-            const sentMessage = {
-                id: `temp-${Date.now()}`,
+            const newMessage = {
+                id: `local-${Date.now()}`,
                 sender: 'member',
                 body: messageDraft.trim(),
                 createdAt: new Date().toISOString(),
                 read: true,
             };
-            setAdminMessages((prev) => [...prev, sentMessage]);
+            setAdminMessages((prev) => [...prev, newMessage]);
             setMessageDraft('');
-            triggerFlash('Message sent to admin team');
+            triggerFlash('Message sent to admin team.');
         }
         catch (error) {
-            console.error('Failed to send message:', error);
+            console.error('Failed to send message to admin:', error);
             triggerFlash('Failed to send message. Please try again.');
         }
     };
-    const handleAuthSuccess = () => {
+    const handleAuthSuccess = (data) => {
+        authService.setToken(data.token);
+        localStorage.setItem('userData', JSON.stringify(data.user));
         setIsLoggedIn(true);
+        setCurrentUser(data.user);
         setShowAuthModal(false);
-        const userData = authService.getUserData();
-        if (userData) {
-            setCurrentUser(userData);
-            triggerFlash(`Welcome back, ${userData.username}!`);
-        }
         fetchAdminMessages();
-    };
-    const handleExploreFeature = (feature) => {
-        const routes = {
-            events: '/events',
-            marketplace: '/marketplace',
-            business: '/business',
-            forums: '/forums',
-        };
-        navigate(routes[feature]);
+        triggerFlash(`Welcome back, ${data.user.username || 'Friend'}!`);
     };
     return (_jsxs(_Fragment, { children: [_jsx(HomeLanding, { isLoggedIn: isLoggedIn, currentUser: currentUser, flashMessage: flashMessage, unreadAdminMessages: unreadAdminMessages, unreadMessagesCount: unreadMessagesCount, onLoginClick: () => {
                     setAuthMode('login');

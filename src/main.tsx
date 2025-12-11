@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster'
 import App from './App'
 import MarketplacePage from './pages/MarketplacePage'
 import BusinessDirectoryPage from './pages/BusinessDirectoryPage'
+import BusinessProfilePage from './pages/BusinessProfilePage'
 import ForumPage from './pages/ForumPage'
 import ForumPostPage from './pages/ForumPostPage'
 import AdminAccessPage from './pages/AdminAccessPage'
@@ -24,6 +25,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/forums" element={<ForumPage />} />
         <Route path="/forums/:postId" element={<ForumPostPage />} />
         <Route path="/business" element={<BusinessDirectoryPage />} />
+        <Route path="/business/:id" element={<BusinessProfilePage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/events" element={<EventsPage />} />
         <Route path="/events/new" element={<NewEventPage />} />
