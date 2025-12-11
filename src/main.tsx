@@ -13,6 +13,7 @@ import AdminAccessPage from './pages/AdminAccessPage'
 import MessagesPage from './pages/MessagesPage'
 import EventsPage from './pages/EventsPage'
 import NewEventPage from './pages/NewEventPage'
+import SupportPage from './pages/SupportPage'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -29,6 +30,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/events" element={<EventsPage />} />
         <Route path="/events/new" element={<NewEventPage />} />
+        <Route path="/support" element={<SupportPage />} />
         <Route path="/*" element={<App />} />
         </Routes>
       </BrowserRouter>

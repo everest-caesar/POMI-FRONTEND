@@ -287,10 +287,16 @@ function App() {
 
   const handleSendMessageToAdmin = async (e: FormEvent) => {
     e.preventDefault()
-    if (!messageDraft.trim() || !isLoggedIn) return
+    if (!messageDraft.trim() || !isLoggedIn) {
+      triggerFlash('Please log in to send a message.')
+      return
+    }
 
     const token = authService.getToken()
-    if (!token) return
+    if (!token) {
+      triggerFlash('Please log in to send a message.')
+      return
+    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/messages/admin/reply`, {
@@ -302,12 +308,15 @@ function App() {
         body: JSON.stringify({ content: messageDraft.trim() }),
       })
 
+      const result = await response.json()
+
       if (!response.ok) {
-        throw new Error('Failed to send message')
+        console.error('Server error:', result)
+        throw new Error(result.error || 'Failed to send message')
       }
 
       const newMessage: AdminMessage = {
-        id: `local-${Date.now()}`,
+        id: result.data?._id || `local-${Date.now()}`,
         sender: 'member',
         body: messageDraft.trim(),
         createdAt: new Date().toISOString(),
@@ -317,9 +326,9 @@ function App() {
       setAdminMessages((prev) => [...prev, newMessage])
       setMessageDraft('')
       triggerFlash('Message sent to admin team.')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to send message to admin:', error)
-      triggerFlash('Failed to send message. Please try again.')
+      triggerFlash(error.message || 'Failed to send message. Please try again.')
     }
   }
 
