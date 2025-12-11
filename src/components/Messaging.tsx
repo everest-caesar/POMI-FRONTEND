@@ -25,6 +25,19 @@ interface Conversation {
   unreadCount: number;
   hasListing?: boolean;
   lastListingId?: string | null;
+  isAdminConversation?: boolean;
+}
+
+interface AdminMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  recipientId: string;
+  recipientName: string;
+  content: string;
+  createdAt: string;
+  isAdminMessage: boolean;
+  isRead: boolean;
 }
 
 interface ListingSummary {
@@ -81,6 +94,8 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
   const [conversationsLoading, setConversationsLoading] = useState(true);
   const [conversationsError, setConversationsError] = useState('');
   const [activeListing, setActiveListing] = useState<ListingSummary | null>(null);
+  const [adminMessages, setAdminMessages] = useState<AdminMessage[]>([]);
+  const [adminUnreadCount, setAdminUnreadCount] = useState(0);
   const [listingContext, setListingContext] = useState<{
     conversationId: string;
     listingId: string;
@@ -90,13 +105,36 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const activeConversationIdRef = useRef<string | null>(null);
+  // Create admin conversation entry from admin messages
+  const adminConversation: Conversation | null = useMemo(() => {
+    if (adminMessages.length === 0) return null;
+    const sortedMessages = [...adminMessages].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    const latestMessage = sortedMessages[0];
+    return {
+      userId: 'admin-team',
+      userName: 'Admin Team',
+      lastMessage: latestMessage?.content || 'Welcome to Pomi!',
+      lastMessageTime: latestMessage?.createdAt || new Date().toISOString(),
+      unreadCount: adminUnreadCount,
+      hasListing: false,
+      lastListingId: null,
+      isAdminConversation: true,
+    };
+  }, [adminMessages, adminUnreadCount]);
+
   const filteredConversations = useMemo(() => {
     const query = conversationQuery.trim().toLowerCase();
+
+    // Start with admin conversation if it exists
+    let allConversations = adminConversation ? [adminConversation, ...conversations] : conversations;
+
     if (!query) {
-      return conversations;
+      return allConversations;
     }
 
-    return conversations.filter((conversation) => {
+    return allConversations.filter((conversation) => {
       const haystackName = conversation.userName?.toLowerCase() || '';
       const haystackMessage = conversation.lastMessage?.toLowerCase() || '';
       return (
@@ -104,13 +142,31 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
         haystackMessage.includes(query)
       );
     });
-  }, [conversationQuery, conversations]);
+  }, [conversationQuery, conversations, adminConversation]);
+
+  const fetchAdminMessages = useCallback(async () => {
+    try {
+      const response = await axiosInstance.get('/messages/admin/inbox');
+      const messages: AdminMessage[] = response.data.data || [];
+      setAdminMessages(messages);
+      const unread = messages.filter((msg) => !msg.isRead && msg.isAdminMessage).length;
+      setAdminUnreadCount(unread);
+    } catch (err: any) {
+      console.error('Failed to fetch admin messages:', err);
+      // Don't show error for admin messages, just set empty
+      setAdminMessages([]);
+      setAdminUnreadCount(0);
+    }
+  }, []);
 
   const fetchConversations = useCallback(async () => {
     try {
       setConversationsLoading(true);
-      const response = await axiosInstance.get('/messages');
-      setConversations(response.data.data);
+      const [conversationsResponse] = await Promise.all([
+        axiosInstance.get('/messages'),
+        fetchAdminMessages(),
+      ]);
+      setConversations(conversationsResponse.data.data);
       setConversationsError('');
     } catch (err: any) {
       console.error('Failed to fetch conversations:', err);
@@ -118,7 +174,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
     } finally {
       setConversationsLoading(false);
     }
-  }, []);
+  }, [fetchAdminMessages]);
 
   const fetchListingDetails = useCallback(
     async (listingId: string, conversationId: string) => {
@@ -352,6 +408,26 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
     setListingError('');
     setListingLoading(false);
 
+    // Handle admin conversation differently
+    if (conversation.isAdminConversation) {
+      // Convert admin messages to regular message format
+      const adminMsgs: Message[] = adminMessages.map((msg) => ({
+        _id: msg.id,
+        senderId: msg.senderId,
+        senderName: msg.senderName,
+        content: msg.content,
+        createdAt: msg.createdAt,
+        isRead: msg.isRead,
+        status: 'sent' as const,
+      }));
+      // Sort chronologically (oldest first)
+      adminMsgs.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      setMessages(adminMsgs);
+      setAdminUnreadCount(0);
+      setLoading(false);
+      return;
+    }
+
     const fetched = await fetchMessages(conversation.userId);
     const nextListingId =
       fetched?.find((msg) => Boolean(msg.listingId))?.listingId ||
@@ -383,9 +459,59 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
 
     const trimmedMessage = messageInput.trim();
     setError('');
-    const listingContextId = resolveListingIdForConversation();
     const clientMessageId = generateClientMessageId();
     const optimisticTimestamp = new Date().toISOString();
+
+    // Handle admin conversation differently
+    if (selectedConversation.isAdminConversation) {
+      const optimisticMessage: Message = {
+        _id: clientMessageId,
+        clientMessageId,
+        senderId: currentUserId,
+        senderName: currentUserName,
+        content: trimmedMessage,
+        createdAt: optimisticTimestamp,
+        isRead: true,
+        status: 'sending',
+      };
+
+      setMessages((prev) => [...prev, optimisticMessage]);
+
+      try {
+        const response = await axiosInstance.post('/messages/admin/reply', {
+          content: trimmedMessage,
+        });
+
+        const persisted = response.data?.data;
+        if (persisted?._id) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.clientMessageId === clientMessageId
+                ? {
+                    ...msg,
+                    _id: persisted._id,
+                    createdAt: persisted.createdAt,
+                    status: 'sent',
+                  }
+                : msg
+            )
+          );
+        }
+
+        setMessageInput('');
+
+        // Refresh admin messages
+        void fetchAdminMessages();
+      } catch (err: any) {
+        console.error('Failed to send message to admin:', err);
+        setError('Failed to send message to admin team');
+        setMessages((prev) => prev.filter((msg) => msg.clientMessageId !== clientMessageId));
+      }
+      return;
+    }
+
+    // Regular user-to-user messaging
+    const listingContextId = resolveListingIdForConversation();
     const optimisticMessage: Message = {
       _id: clientMessageId,
       clientMessageId,
@@ -504,7 +630,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
     );
   }
 
-  if (conversations.length === 0 && !loading && !conversationsError) {
+  if (conversations.length === 0 && adminMessages.length === 0 && !loading && !conversationsError) {
     return (
       <div className="flex flex-col items-center justify-center h-96 text-center">
         <span className="text-6xl mb-4">💬</span>
@@ -579,18 +705,29 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
                     <p className="font-semibold text-gray-900 truncate">
                       {conversation.userName}
                     </p>
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        onlineUsers.has(conversation.userId)
-                          ? 'bg-emerald-500'
-                          : 'bg-gray-300'
-                      }`}
-                    />
+                    {conversation.isAdminConversation ? (
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                        ADMIN
+                      </span>
+                    ) : (
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          onlineUsers.has(conversation.userId)
+                            ? 'bg-emerald-500'
+                            : 'bg-gray-300'
+                        }`}
+                      />
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 line-clamp-1">
                     {conversation.lastMessage}
                   </p>
-                  {conversation.hasListing && (
+                  {conversation.isAdminConversation && (
+                    <p className="text-[11px] font-semibold text-emerald-600">
+                      Support & announcements
+                    </p>
+                  )}
+                  {conversation.hasListing && !conversation.isAdminConversation && (
                     <p className="text-[11px] font-semibold text-amber-600">
                       Listing inquiry
                     </p>
@@ -635,20 +772,33 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
                   <h3 className="text-lg font-semibold text-gray-900">
                     {selectedConversation.userName}
                   </h3>
-                  <span
-                    className={`text-xs font-semibold ${
-                      isUserOnline ? 'text-emerald-600' : 'text-gray-400'
-                    }`}
-                  >
-                    ● {isUserOnline ? 'Online now' : 'Offline'}
-                  </span>
+                  {selectedConversation.isAdminConversation ? (
+                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                      ADMIN TEAM
+                    </span>
+                  ) : (
+                    <span
+                      className={`text-xs font-semibold ${
+                        isUserOnline ? 'text-emerald-600' : 'text-gray-400'
+                      }`}
+                    >
+                      ● {isUserOnline ? 'Online now' : 'Offline'}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-gray-500">
-                  Last active {formatRelativeTime(selectedConversation.lastMessageTime)}
+                  {selectedConversation.isAdminConversation
+                    ? 'Support & community announcements'
+                    : `Last active ${formatRelativeTime(selectedConversation.lastMessageTime)}`}
                 </p>
               </div>
               <div className="text-right">
-                {selectedConversation.hasListing && (
+                {selectedConversation.isAdminConversation && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    🛡️ Official support
+                  </span>
+                )}
+                {selectedConversation.hasListing && !selectedConversation.isAdminConversation && (
                   <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
                     🛍️ Listing chat
                   </span>
@@ -774,7 +924,11 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
                 <textarea
                   value={messageInput}
                   onChange={handleTyping}
-                  placeholder="Type a message..."
+                  placeholder={
+                    selectedConversation?.isAdminConversation
+                      ? "Send a message to the admin team..."
+                      : "Type a message..."
+                  }
                   className="flex-1 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100 resize-none selection:bg-red-100 selection:text-gray-900"
                   rows={3}
                 />

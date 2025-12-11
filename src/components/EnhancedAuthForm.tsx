@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import authService from '../services/authService'
 
 interface EnhancedAuthFormProps {
@@ -6,6 +6,21 @@ interface EnhancedAuthFormProps {
   onSuccess: (data: any) => void
   onClose: () => void
   onModeChange: (mode: 'login' | 'register') => void
+}
+
+interface PasswordRequirement {
+  label: string
+  met: boolean
+}
+
+function validatePasswordStrength(password: string): PasswordRequirement[] {
+  return [
+    { label: 'At least 8 characters', met: password.length >= 8 },
+    { label: 'One uppercase letter', met: /[A-Z]/.test(password) },
+    { label: 'One lowercase letter', met: /[a-z]/.test(password) },
+    { label: 'One number', met: /[0-9]/.test(password) },
+    { label: 'One special character (!@#$%^&*)', met: /[!@#$%^&*]/.test(password) },
+  ]
 }
 
 export default function EnhancedAuthForm({
@@ -20,8 +35,19 @@ export default function EnhancedAuthForm({
     username: '',
     age: '',
   })
+  const [verificationCode, setVerificationCode] = useState('')
+  const [pendingEmail, setPendingEmail] = useState('')
+  const [step, setStep] = useState<'credentials' | 'verify'>('credentials')
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false)
+
+  const passwordRequirements = useMemo(
+    () => validatePasswordStrength(formData.password),
+    [formData.password]
+  )
+  const isPasswordStrong = passwordRequirements.every((req) => req.met)
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -32,6 +58,7 @@ export default function EnhancedAuthForm({
 
   const handleAuth = async () => {
     setError('')
+    setSuccessMessage('')
     setLoading(true)
     let parsedAge: number | undefined = undefined
 
@@ -57,8 +84,17 @@ export default function EnhancedAuthForm({
         return
       }
 
-      if (formData.password.length < 6) {
-        setError('Password must be at least 6 characters')
+      // Strong password validation for registration
+      if (authMode === 'register' && !isPasswordStrong) {
+        const unmetRequirements = passwordRequirements.filter((r) => !r.met)
+        setError(`Password requirements: ${unmetRequirements.map((r) => r.label).join(', ')}`)
+        setLoading(false)
+        return
+      }
+
+      // Basic password length check for login
+      if (authMode === 'login' && formData.password.length < 6) {
+        setError('Please enter your password')
         setLoading(false)
         return
       }
@@ -85,24 +121,36 @@ export default function EnhancedAuthForm({
         parsedAge = ageValue
       }
 
-      let response
       if (authMode === 'register') {
-        response = await authService.register({
+        // Registration - direct login after success
+        const response = await authService.register({
           email: formData.email,
           password: formData.password,
           username: formData.username,
           age: parsedAge as number,
         })
+        authService.setToken(response.token)
+        onSuccess(response.user)
+        onClose()
       } else {
-        response = await authService.login({
+        // Login - Step 1: Password verification, sends 2FA code
+        const response = await authService.login({
           email: formData.email,
           password: formData.password,
         })
-      }
 
-      authService.setToken(response.token)
-      onSuccess(response.user)
-      onClose()
+        if (response.requiresVerification) {
+          // Move to verification step
+          setPendingEmail(response.email || formData.email)
+          setStep('verify')
+          setSuccessMessage('A verification code has been sent to your email')
+        } else if (response.token && response.user) {
+          // Direct login (fallback if 2FA is disabled)
+          authService.setToken(response.token)
+          onSuccess(response.user)
+          onClose()
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Authentication failed')
     } finally {
@@ -110,6 +158,164 @@ export default function EnhancedAuthForm({
     }
   }
 
+  const handleVerifyCode = async () => {
+    setError('')
+    setSuccessMessage('')
+    setLoading(true)
+
+    try {
+      if (!verificationCode || verificationCode.length !== 6) {
+        setError('Please enter the 6-digit verification code')
+        setLoading(false)
+        return
+      }
+
+      const response = await authService.verifyLoginCode({
+        email: pendingEmail,
+        code: verificationCode,
+      })
+
+      authService.setToken(response.token)
+      onSuccess(response.user)
+      onClose()
+    } catch (err: any) {
+      setError(err.message || 'Verification failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResendCode = async () => {
+    setError('')
+    setSuccessMessage('')
+    setLoading(true)
+
+    try {
+      // Re-submit login to get a new code
+      await authService.login({
+        email: formData.email,
+        password: formData.password,
+      })
+      setSuccessMessage('A new verification code has been sent to your email')
+      setVerificationCode('')
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend code')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBackToLogin = () => {
+    setStep('credentials')
+    setVerificationCode('')
+    setPendingEmail('')
+    setError('')
+    setSuccessMessage('')
+  }
+
+  const resetForm = () => {
+    setFormData({ email: '', password: '', username: '', age: '' })
+    setVerificationCode('')
+    setPendingEmail('')
+    setStep('credentials')
+    setError('')
+    setSuccessMessage('')
+    setShowPasswordRequirements(false)
+  }
+
+  // Verification Code Step UI
+  if (step === 'verify') {
+    return (
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="mb-6">
+          <h3 className="text-3xl font-bold bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">
+            Verify Your Identity
+          </h3>
+          <p className="text-gray-600 text-sm mt-2 font-medium">
+            Enter the 6-digit code sent to {pendingEmail}
+          </p>
+        </div>
+
+        {/* Success Message */}
+        {successMessage && (
+          <div className="bg-green-50 border border-green-200 border-l-4 border-l-green-600 text-green-700 px-4 py-3 rounded-lg text-sm font-medium">
+            {successMessage}
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 border-l-4 border-l-red-600 text-red-700 px-4 py-3 rounded-lg text-sm font-medium">
+            {error}
+          </div>
+        )}
+
+        {/* Verification Code Input */}
+        <div className="space-y-3">
+          <div>
+            <label className="block text-gray-900 font-semibold mb-2 text-sm">
+              Verification Code *
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              placeholder="Enter 6-digit code"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              className="w-full bg-gray-50 text-gray-900 px-4 py-3 rounded-lg border border-gray-300 hover:border-gray-400 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-lg text-center tracking-[0.5em] font-mono placeholder:tracking-normal placeholder:text-sm"
+              autoFocus
+            />
+          </div>
+
+          <p className="text-xs text-gray-500">
+            The code will expire in 10 minutes. Check your spam folder if you don't see it.
+          </p>
+        </div>
+
+        {/* Verify Button */}
+        <button
+          onClick={handleVerifyCode}
+          disabled={loading || verificationCode.length !== 6}
+          className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition-all text-base shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 mt-4"
+        >
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="animate-spin">⚙️</span>
+              Verifying...
+            </span>
+          ) : (
+            'Verify & Sign In'
+          )}
+        </button>
+
+        {/* Resend Code */}
+        <div className="text-center space-y-2">
+          <button
+            onClick={handleResendCode}
+            disabled={loading}
+            className="text-red-600 hover:text-red-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm underline underline-offset-2"
+          >
+            Resend verification code
+          </button>
+
+          <div>
+            <button
+              onClick={handleBackToLogin}
+              disabled={loading}
+              className="text-gray-500 hover:text-gray-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+            >
+              Back to login
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Credentials Step UI (Login/Register)
   return (
     <div className="space-y-4">
       {/* Header with Gradient */}
@@ -184,12 +390,37 @@ export default function EnhancedAuthForm({
             type="password"
             name="password"
             placeholder={
-              authMode === 'register' ? 'At least 6 characters' : 'Your password'
+              authMode === 'register' ? 'Create a strong password' : 'Your password'
             }
             value={formData.password}
             onChange={handleInputChange}
+            onFocus={() => authMode === 'register' && setShowPasswordRequirements(true)}
+            onBlur={() => setTimeout(() => setShowPasswordRequirements(false), 200)}
             className="w-full bg-gray-50 text-gray-900 px-4 py-2.5 rounded-lg border border-gray-300 hover:border-gray-400 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-sm placeholder:text-gray-600"
           />
+          {/* Password requirements - registration only */}
+          {authMode === 'register' && (showPasswordRequirements || formData.password) && (
+            <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-xs font-semibold text-gray-700 mb-2">Password must include:</p>
+              <ul className="space-y-1">
+                {passwordRequirements.map((req, index) => (
+                  <li
+                    key={index}
+                    className={`text-xs flex items-center gap-2 ${
+                      req.met ? 'text-green-600' : 'text-gray-500'
+                    }`}
+                  >
+                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${
+                      req.met ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-400'
+                    }`}>
+                      {req.met ? '✓' : '○'}
+                    </span>
+                    {req.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Age - Registration only */}
@@ -218,6 +449,12 @@ export default function EnhancedAuthForm({
             community member access.
           </p>
         )}
+
+        {authMode === 'login' && (
+          <p className="text-xs text-gray-500 mt-2">
+            A verification code will be sent to your email for secure login.
+          </p>
+        )}
       </div>
 
       {/* Submit Button */}
@@ -229,10 +466,10 @@ export default function EnhancedAuthForm({
         {loading ? (
           <span className="flex items-center justify-center gap-2">
             <span className="animate-spin">⚙️</span>
-            Loading...
+            {authMode === 'login' ? 'Sending Code...' : 'Creating Account...'}
           </span>
         ) : authMode === 'login' ? (
-          'Sign In'
+          'Continue'
         ) : (
           'Create Account'
         )}
@@ -271,13 +508,7 @@ export default function EnhancedAuthForm({
         <button
           onClick={() => {
             onModeChange(authMode === 'login' ? 'register' : 'login')
-            setError('')
-            setFormData({
-              email: '',
-              password: '',
-              username: '',
-              age: '',
-            })
+            resetForm()
           }}
           disabled={loading}
           className="text-red-600 hover:text-red-700 font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-colors px-4 py-2 rounded-lg hover:bg-red-50"

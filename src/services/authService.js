@@ -54,6 +54,19 @@ class AuthService {
             throw new Error(message);
         }
     }
+    async verifyLoginCode(data) {
+        try {
+            const response = await this.api.post('/auth/verify-login', {
+                email: data.email,
+                code: data.code,
+            });
+            return response.data;
+        }
+        catch (error) {
+            const message = error.response?.data?.error || 'Verification failed';
+            throw new Error(message);
+        }
+    }
     async adminLogin(data) {
         try {
             const response = await this.api.post('/auth/admin/login', {

@@ -117,6 +117,8 @@ export default function ForumPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [filtersHydrated, setFiltersHydrated] = useState(false)
   const lastSyncedQueryRef = useRef(location.search)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 10
 
   const isAuthenticated = authService.isAuthenticated()
   const isAdmin = Boolean(authService.getUserData()?.isAdmin)
@@ -254,6 +256,17 @@ export default function ForumPage() {
 
     return sorted
   }, [posts, activeCommunity, searchTerm, selectedSort])
+
+  const totalPages = Math.ceil(visiblePosts.length / ITEMS_PER_PAGE)
+  const paginatedPosts = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    return visiblePosts.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  }, [visiblePosts, currentPage, ITEMS_PER_PAGE])
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [activeCommunity, searchTerm, selectedSort])
 
   const calculateThreadScore = (post: ForumPost) => {
     const replies = post.repliesCount || 0
@@ -579,56 +592,110 @@ export default function ForumPage() {
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
-              {visiblePosts.map((post) => (
-                <article
-                  key={post._id}
-                  className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-slate-900/40 backdrop-blur transition hover:-translate-y-1"
-                >
-                  <header className="flex flex-wrap items-center gap-3 text-xs text-white/60">
-                    <span className="font-semibold text-white">
-                      {
-                        COMMUNITY_CONFIG.find(
-                          (community) => community.id === post.category,
-                        )?.label ?? 'Community'
-                      }
-                    </span>
-                    <span>•</span>
-                    <span>{post.authorName || 'Community member'}</span>
-                    <span>•</span>
-                    <span>{formatRelativeTime(post.createdAt)}</span>
-                  </header>
+            <>
+              <div className="space-y-4">
+                {paginatedPosts.map((post) => (
+                  <article
+                    key={post._id}
+                    className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-slate-900/40 backdrop-blur transition hover:-translate-y-1"
+                  >
+                    <header className="flex flex-wrap items-center gap-3 text-xs text-white/60">
+                      <span className="font-semibold text-white">
+                        {
+                          COMMUNITY_CONFIG.find(
+                            (community) => community.id === post.category,
+                          )?.label ?? 'Community'
+                        }
+                      </span>
+                      <span>•</span>
+                      <span>{post.authorName || 'Community member'}</span>
+                      <span>•</span>
+                      <span>{formatRelativeTime(post.createdAt)}</span>
+                    </header>
 
-                  <Link to={`/forums/${post._id}`} className="mt-3 block space-y-3">
-                    <h3 className="text-lg font-semibold text-white">{post.title}</h3>
-                    <p className="text-sm text-white/80 line-clamp-3">{post.content}</p>
-                  </Link>
-
-                  <footer className="mt-4 flex flex-wrap items-center gap-3 text-xs font-semibold text-white/60">
-                    <span>💬 {post.repliesCount ?? 0} replies</span>
-                    <span>👀 {post.viewsCount ?? 0} views</span>
-                    {post.tags && post.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {post.tags.slice(0, 3).map((tag) => (
-                          <span
-                            key={tag}
-                            className="inline-flex items-center gap-1 rounded-full border border-white/15 px-3 py-1"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <Link
-                      to={`/forums/${post._id}`}
-                      className="ml-auto inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1 text-white/80 transition hover:border-white/40 hover:text-white"
-                    >
-                      View thread →
+                    <Link to={`/forums/${post._id}`} className="mt-3 block space-y-3">
+                      <h3 className="text-lg font-semibold text-white">{post.title}</h3>
+                      <p className="text-sm text-white/80 line-clamp-3">{post.content}</p>
                     </Link>
-                  </footer>
-                </article>
-              ))}
-            </div>
+
+                    <footer className="mt-4 flex flex-wrap items-center gap-3 text-xs font-semibold text-white/60">
+                      <span>💬 {post.repliesCount ?? 0} replies</span>
+                      <span>👀 {post.viewsCount ?? 0} views</span>
+                      {post.tags && post.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {post.tags.slice(0, 3).map((tag) => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center gap-1 rounded-full border border-white/15 px-3 py-1"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <Link
+                        to={`/forums/${post._id}`}
+                        className="ml-auto inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1 text-white/80 transition hover:border-white/40 hover:text-white"
+                      >
+                        View thread →
+                      </Link>
+                    </footer>
+                  </article>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="rounded-full border border-white/15 px-3 py-1 text-sm font-semibold text-white/70 transition hover:border-white/40 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      ← Previous
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
+                        let pageNum: number
+                        if (totalPages <= 5) {
+                          pageNum = i + 1
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i
+                        } else {
+                          pageNum = currentPage - 2 + i
+                        }
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`h-8 w-8 rounded-full text-sm font-semibold transition ${
+                              currentPage === pageNum
+                                ? 'bg-gradient-to-r from-red-500 via-rose-500 to-orange-500 text-white'
+                                : 'text-white/70 hover:bg-white/10 hover:text-white'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <button
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className="rounded-full border border-white/15 px-3 py-1 text-sm font-semibold text-white/70 transition hover:border-white/40 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                  <p className="text-xs text-white/60">
+                    Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, visiblePosts.length)} of {visiblePosts.length} threads
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </section>
 

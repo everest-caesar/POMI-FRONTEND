@@ -42,6 +42,7 @@ export default function BusinessProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [submittingReview, setSubmittingReview] = useState(false)
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' })
+  const [confirmVisit, setConfirmVisit] = useState(false)
   const token = authService.getToken()
 
   useEffect(() => {
@@ -82,6 +83,10 @@ export default function BusinessProfilePage() {
     }
     if (!token) {
       setError('Sign in to leave a review.')
+      return
+    }
+    if (!confirmVisit) {
+      setError('Please confirm you visited or used this service.')
       return
     }
     setSubmittingReview(true)
@@ -245,28 +250,58 @@ export default function BusinessProfilePage() {
             )}
           </div>
           {token ? (
-            <div className="grid gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-white">Your rating</label>
-                <select
-                  className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white"
-                  value={reviewForm.rating}
-                  onChange={(e) => setReviewForm((prev) => ({ ...prev, rating: Number(e.target.value) }))}
-                >
-                  {[5, 4, 3, 2, 1].map((value) => (
-                    <option key={value} value={value}>
-                      {value} star{value > 1 ? 's' : ''}
-                    </option>
-                  ))}
-                </select>
+            <div className="grid gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+              {/* Confirm Visit Checkbox */}
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={confirmVisit}
+                    onChange={(e) => setConfirmVisit(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-700 bg-slate-800 text-orange-500 focus:ring-orange-500"
+                  />
+                  I confirm I visited or used this service
+                </label>
+                <span className="text-xs text-slate-500">Required to rate</span>
               </div>
+
+              {!confirmVisit && (
+                <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                  Confirming your visit keeps reviews accountable and useful for neighbours.
+                </p>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-semibold text-white">Your rating</label>
+                  <select
+                    className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white"
+                    value={reviewForm.rating}
+                    onChange={(e) => setReviewForm((prev) => ({ ...prev, rating: Number(e.target.value) }))}
+                    disabled={!confirmVisit}
+                  >
+                    {[5, 4, 3, 2, 1].map((value) => (
+                      <option key={value} value={value}>
+                        {value} star{value > 1 ? 's' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <Textarea
-                placeholder="What stood out? Would you recommend them?"
+                placeholder="Share what stood out about this business..."
                 value={reviewForm.comment}
                 onChange={(e) => setReviewForm((prev) => ({ ...prev, comment: e.target.value }))}
-                className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-500 min-h-[120px]"
+                className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-500 min-h-[100px]"
+                disabled={!confirmVisit}
               />
-              <Button onClick={handleSubmitReview} disabled={submittingReview} className="bg-orange-500 hover:bg-orange-600">
+
+              <Button
+                onClick={handleSubmitReview}
+                disabled={submittingReview || !confirmVisit || !reviewForm.comment.trim()}
+                className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50"
+              >
                 {submittingReview ? 'Sending…' : 'Submit review'}
               </Button>
             </div>

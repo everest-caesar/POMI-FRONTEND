@@ -31,6 +31,20 @@ interface AuthResponse {
   message: string;
 }
 
+interface LoginResponse {
+  requiresVerification?: boolean;
+  email?: string;
+  message: string;
+  // Also can contain token and user if 2FA is disabled
+  token?: string;
+  user?: AuthResponse['user'];
+}
+
+interface VerifyLoginRequest {
+  email: string;
+  code: string;
+}
+
 export interface User {
   _id: string;
   email: string;
@@ -81,15 +95,28 @@ class AuthService {
     }
   }
 
-  async login(data: LoginRequest): Promise<AuthResponse> {
+  async login(data: LoginRequest): Promise<LoginResponse> {
     try {
-      const response = await this.api.post<AuthResponse>('/auth/login', {
+      const response = await this.api.post<LoginResponse>('/auth/login', {
         email: data.email,
         password: data.password,
       });
       return response.data;
     } catch (error: any) {
       const message = error.response?.data?.error || 'Login failed';
+      throw new Error(message);
+    }
+  }
+
+  async verifyLoginCode(data: VerifyLoginRequest): Promise<AuthResponse> {
+    try {
+      const response = await this.api.post<AuthResponse>('/auth/verify-login', {
+        email: data.email,
+        code: data.code,
+      });
+      return response.data;
+    } catch (error: any) {
+      const message = error.response?.data?.error || 'Verification failed';
       throw new Error(message);
     }
   }
