@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Search, ShieldCheck, Globe, Star, Phone, Mail, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, ShieldCheck, Globe, Star, Phone, Mail, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react'
 import axiosInstance from '../utils/axios'
 import authService from '../services/authService'
 import { Button } from '@/components/ui/button'
@@ -156,6 +156,15 @@ export default function BusinessDirectoryPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-slate-300 hover:text-white hover:bg-slate-800"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
           <Link to="/" className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-rose-600 hover:scale-[1.02] transition">
               <span className="text-lg font-bold text-white">P</span>
