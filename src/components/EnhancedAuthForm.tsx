@@ -23,6 +23,14 @@ function validatePasswordStrength(password: string): PasswordRequirement[] {
   ]
 }
 
+const ageRanges = [
+  { value: '18', label: '18-24' },
+  { value: '25', label: '25-34' },
+  { value: '35', label: '35-44' },
+  { value: '45', label: '45-54' },
+  { value: '55', label: '55+' },
+]
+
 export default function EnhancedAuthForm({
   authMode,
   onSuccess,
@@ -33,7 +41,7 @@ export default function EnhancedAuthForm({
     email: '',
     password: '',
     username: '',
-    age: '',
+    age: '25',
   })
   const [verificationCode, setVerificationCode] = useState('')
   const [pendingEmail, setPendingEmail] = useState('')
@@ -101,24 +109,11 @@ export default function EnhancedAuthForm({
 
       if (authMode === 'register') {
         if (!formData.age) {
-          setError('Please tell us your age')
+          setError('Please select your age range')
           setLoading(false)
           return
         }
-
-        const ageValue = parseInt(formData.age, 10)
-        if (Number.isNaN(ageValue)) {
-          setError('Age must be a valid number')
-          setLoading(false)
-          return
-        }
-
-        if (ageValue < 13 || ageValue > 120) {
-          setError('Age must be between 13 and 120')
-          setLoading(false)
-          return
-        }
-        parsedAge = ageValue
+        parsedAge = parseInt(formData.age, 10)
       }
 
       if (authMode === 'register') {
@@ -214,7 +209,7 @@ export default function EnhancedAuthForm({
   }
 
   const resetForm = () => {
-    setFormData({ email: '', password: '', username: '', age: '' })
+    setFormData({ email: '', password: '', username: '', age: '25' })
     setVerificationCode('')
     setPendingEmail('')
     setStep('credentials')
@@ -223,30 +218,30 @@ export default function EnhancedAuthForm({
     setShowPasswordRequirements(false)
   }
 
-  // Verification Code Step UI
+  // Verification Code Step UI - Dark Theme
   if (step === 'verify') {
     return (
       <div className="space-y-4">
         {/* Header */}
         <div className="mb-6">
-          <h3 className="text-3xl font-bold bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">
+          <h3 className="text-2xl font-bold text-white">
             Verify Your Identity
           </h3>
-          <p className="text-gray-600 text-sm mt-2 font-medium">
+          <p className="text-sm text-slate-400 mt-2">
             Enter the 6-digit code sent to {pendingEmail}
           </p>
         </div>
 
         {/* Success Message */}
         {successMessage && (
-          <div className="bg-green-50 border border-green-200 border-l-4 border-l-green-600 text-green-700 px-4 py-3 rounded-lg text-sm font-medium">
+          <div className="rounded-lg border border-emerald-600/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
             {successMessage}
           </div>
         )}
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 border-l-4 border-l-red-600 text-red-700 px-4 py-3 rounded-lg text-sm font-medium">
+          <div className="rounded-lg border border-rose-600/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
             {error}
           </div>
         )}
@@ -254,8 +249,8 @@ export default function EnhancedAuthForm({
         {/* Verification Code Input */}
         <div className="space-y-3">
           <div>
-            <label className="block text-gray-900 font-semibold mb-2 text-sm">
-              Verification Code *
+            <label className="block text-slate-200 font-medium mb-2 text-sm">
+              Verification Code
             </label>
             <input
               type="text"
@@ -265,12 +260,12 @@ export default function EnhancedAuthForm({
               placeholder="Enter 6-digit code"
               value={verificationCode}
               onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="w-full bg-gray-50 text-gray-900 px-4 py-3 rounded-lg border border-gray-300 hover:border-gray-400 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-lg text-center tracking-[0.5em] font-mono placeholder:tracking-normal placeholder:text-sm"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white text-lg text-center tracking-[0.5em] font-mono placeholder:tracking-normal placeholder:text-sm placeholder:text-slate-500 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
               autoFocus
             />
           </div>
 
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-slate-500">
             The code will expire in 10 minutes. Check your spam folder if you don't see it.
           </p>
         </div>
@@ -279,11 +274,11 @@ export default function EnhancedAuthForm({
         <button
           onClick={handleVerifyCode}
           disabled={loading || verificationCode.length !== 6}
-          className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition-all text-base shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 mt-4"
+          className="w-full rounded-lg bg-orange-500 hover:bg-orange-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-3 transition-colors mt-4"
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
-              <span className="animate-spin">⚙️</span>
+              <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
               Verifying...
             </span>
           ) : (
@@ -292,11 +287,11 @@ export default function EnhancedAuthForm({
         </button>
 
         {/* Resend Code */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-2 pt-2">
           <button
             onClick={handleResendCode}
             disabled={loading}
-            className="text-red-600 hover:text-red-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm underline underline-offset-2"
+            className="text-orange-400 hover:text-orange-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
           >
             Resend verification code
           </button>
@@ -305,7 +300,7 @@ export default function EnhancedAuthForm({
             <button
               onClick={handleBackToLogin}
               disabled={loading}
-              className="text-gray-500 hover:text-gray-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+              className="text-slate-400 hover:text-slate-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
             >
               Back to login
             </button>
@@ -315,103 +310,129 @@ export default function EnhancedAuthForm({
     )
   }
 
-  // Credentials Step UI (Login/Register)
+  // Credentials Step UI (Login/Register) - Dark Theme
   return (
     <div className="space-y-4">
-      {/* Header with Gradient */}
-      <div className="mb-6">
-        <h3 className="text-3xl font-bold bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">
-          {authMode === 'login' ? 'Welcome Back' : 'Join Our Community'}
-        </h3>
-        <p className="text-gray-600 text-sm mt-2 font-medium">
+      {/* Header */}
+      <div className="mb-4">
+        <h2 className="text-2xl font-bold text-white mb-2">
+          {authMode === 'login' ? 'Sign in' : 'Create account'}
+        </h2>
+        <p className="text-sm text-slate-400">
           {authMode === 'login'
-            ? 'Sign in to your Pomi account'
-            : 'Create your account to connect with Pomi community'}
+            ? 'Access messaging and contact sellers. You can browse without signing in.'
+            : 'Join our community to connect, share, and discover.'}
         </p>
+      </div>
+
+      {/* Tab-style Toggle */}
+      <div className="flex gap-2 mb-4">
+        <button
+          type="button"
+          className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+            authMode === 'login'
+              ? 'bg-orange-500 text-white'
+              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+          }`}
+          onClick={() => {
+            onModeChange('login')
+            resetForm()
+          }}
+        >
+          Sign in
+        </button>
+        <button
+          type="button"
+          className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+            authMode === 'register'
+              ? 'bg-orange-500 text-white'
+              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+          }`}
+          onClick={() => {
+            onModeChange('register')
+            resetForm()
+          }}
+        >
+          Create account
+        </button>
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 border-l-4 border-l-red-600 text-red-700 px-4 py-3 rounded-lg text-sm font-medium animate-slideInDown">
+        <div className="rounded-lg border border-rose-600/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
           {error}
         </div>
       )}
 
       {/* Form Fields */}
-      <div className="space-y-3">
+      <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); handleAuth(); }}>
         {/* Full Name - Registration only */}
         {authMode === 'register' && (
-          <div className="animate-slideInUp" style={{ animationDelay: '0.05s' }}>
-            <label className="block text-gray-900 font-semibold mb-2 text-sm">
-              Full Name *
-            </label>
-            <input
-              type="text"
-              name="username"
-              placeholder="Enter your full name"
-              value={formData.username}
-              onChange={handleInputChange}
-              className="w-full bg-gray-50 text-gray-900 px-4 py-2.5 rounded-lg border border-gray-300 hover:border-gray-400 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-sm placeholder:text-gray-600"
-            />
-          </div>
+          <input
+            type="text"
+            name="username"
+            placeholder="Full name"
+            value={formData.username}
+            onChange={handleInputChange}
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+          />
         )}
 
         {/* Email */}
-        <div
-          className="animate-slideInUp"
-          style={{
-            animationDelay: authMode === 'register' ? '0.1s' : '0.05s',
-          }}
-        >
-          <label className="block text-gray-900 font-semibold mb-2 text-sm">
-            Email Address *
-          </label>
-          <input
-            type="email"
-            name="email"
-            placeholder="your@email.com"
-            value={formData.email}
+        <input
+          type="email"
+          name="email"
+          placeholder="you@example.com"
+          value={formData.email}
+          onChange={handleInputChange}
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+          required
+        />
+
+        {/* Age Dropdown - Registration only */}
+        {authMode === 'register' && (
+          <select
+            name="age"
+            value={formData.age}
             onChange={handleInputChange}
-            className="w-full bg-gray-50 text-gray-900 px-4 py-2.5 rounded-lg border border-gray-300 hover:border-gray-400 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-sm placeholder:text-gray-600"
-          />
-        </div>
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+          >
+            {ageRanges.map((range) => (
+              <option key={range.value} value={range.value}>
+                {range.label}
+              </option>
+            ))}
+          </select>
+        )}
 
         {/* Password */}
-        <div
-          className="animate-slideInUp"
-          style={{
-            animationDelay: authMode === 'register' ? '0.15s' : '0.1s',
-          }}
-        >
-          <label className="block text-gray-900 font-semibold mb-2 text-sm">
-            Password *
-          </label>
+        <div>
           <input
             type="password"
             name="password"
-            placeholder={
-              authMode === 'register' ? 'Create a strong password' : 'Your password'
-            }
+            placeholder="Password"
             value={formData.password}
             onChange={handleInputChange}
             onFocus={() => authMode === 'register' && setShowPasswordRequirements(true)}
             onBlur={() => setTimeout(() => setShowPasswordRequirements(false), 200)}
-            className="w-full bg-gray-50 text-gray-900 px-4 py-2.5 rounded-lg border border-gray-300 hover:border-gray-400 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-sm placeholder:text-gray-600"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            required
           />
+
           {/* Password requirements - registration only */}
           {authMode === 'register' && (showPasswordRequirements || formData.password) && (
-            <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-xs font-semibold text-gray-700 mb-2">Password must include:</p>
+            <div className="mt-2 p-3 rounded-lg border border-slate-700 bg-slate-800/50">
+              <p className="text-xs font-medium text-slate-300 mb-2">Password must include:</p>
               <ul className="space-y-1">
                 {passwordRequirements.map((req, index) => (
                   <li
                     key={index}
                     className={`text-xs flex items-center gap-2 ${
-                      req.met ? 'text-green-600' : 'text-gray-500'
+                      req.met ? 'text-emerald-400' : 'text-slate-500'
                     }`}
                   >
                     <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${
-                      req.met ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-400'
+                      req.met ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-500'
                     }`}>
                       {req.met ? '✓' : '○'}
                     </span>
@@ -423,99 +444,44 @@ export default function EnhancedAuthForm({
           )}
         </div>
 
-        {/* Age - Registration only */}
-        {authMode === 'register' && (
-          <div className="animate-slideInUp" style={{ animationDelay: '0.2s' }}>
-            <label className="block text-gray-900 font-semibold mb-2 text-sm">
-              Age *
-            </label>
-            <input
-              type="number"
-              name="age"
-              placeholder="Your age (13-120)"
-              value={formData.age}
-              onChange={handleInputChange}
-              min="13"
-              max="120"
-              required
-              className="w-full bg-gray-50 text-gray-900 px-4 py-2.5 rounded-lg border border-gray-300 hover:border-gray-400 focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition text-sm placeholder:text-gray-600"
-            />
-          </div>
-        )}
-
-        {authMode === 'register' && (
-          <p className="text-xs text-gray-500 mt-2">
-            Admin accounts are managed separately by the operations team. Complete this form only for
-            community member access.
-          </p>
-        )}
-
         {authMode === 'login' && (
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-slate-500">
             A verification code will be sent to your email for secure login.
           </p>
         )}
-      </div>
 
-      {/* Submit Button */}
-      <button
-        onClick={handleAuth}
-        disabled={loading}
-        className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition-all text-base shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 mt-6"
-      >
-        {loading ? (
-          <span className="flex items-center justify-center gap-2">
-            <span className="animate-spin">⚙️</span>
-            {authMode === 'login' ? 'Sending Code...' : 'Creating Account...'}
-          </span>
-        ) : authMode === 'login' ? (
-          'Continue'
-        ) : (
-          'Create Account'
-        )}
-      </button>
-
-      {/* Divider */}
-      <div className="relative my-4">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300"></div>
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-white text-gray-600">Or</span>
-        </div>
-      </div>
-
-      {authMode === 'login' && (
-        <p className="text-center text-xs text-gray-500">
-          Admin team?{' '}
-          <a
-            href="/admin"
-            className="font-semibold text-red-600 underline decoration-red-200 underline-offset-4"
+        {/* Submit Buttons */}
+        <div className="flex justify-end gap-2 pt-2">
+          <button
+            type="button"
+            className="rounded-lg px-3 py-2 text-sm text-slate-300 hover:text-white transition-colors"
+            onClick={onClose}
           >
-            Open the secure console
-          </a>
-          .
-        </p>
-      )}
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-lg bg-orange-500 hover:bg-orange-600 disabled:bg-slate-700 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition-colors"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                {authMode === 'login' ? 'Sending...' : 'Creating...'}
+              </span>
+            ) : authMode === 'login' ? (
+              'Sign in'
+            ) : (
+              'Create account'
+            )}
+          </button>
+        </div>
+      </form>
 
-      {/* Mode Toggle */}
-      <div className="text-center">
-        <p className="text-gray-900 text-sm mb-2">
-          {authMode === 'login'
-            ? "Don't have an account? "
-            : 'Already have an account? '}
-        </p>
-        <button
-          onClick={() => {
-            onModeChange(authMode === 'login' ? 'register' : 'login')
-            resetForm()
-          }}
-          disabled={loading}
-          className="text-red-600 hover:text-red-700 font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-colors px-4 py-2 rounded-lg hover:bg-red-50"
-        >
-          {authMode === 'login' ? 'Sign Up' : 'Sign In'}
-        </button>
-      </div>
+      {/* Help text */}
+      <p className="text-xs text-slate-500 pt-2">
+        Need help? <a href="mailto:support@pomi.community" className="text-orange-400 hover:underline">support@pomi.community</a>
+      </p>
     </div>
   )
 }

@@ -540,17 +540,16 @@ function App() {
         </div>
       )}
 
-      {/* Auth Modal */}
+      {/* Auth Modal - Dark Theme with Backdrop Blur */}
       {showAuthModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur">
-          <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-gray-200 bg-white p-8 shadow-[0_30px_60px_rgba(0,0,0,0.15)]">
-            <button
-              onClick={() => setShowAuthModal(false)}
-              className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-rose-600 text-2xl font-bold shadow-lg shadow-rose-200 ring-2 ring-rose-100 transition hover:-translate-y-0.5"
-              aria-label="Close authentication modal"
-            >
-              ×
-            </button>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur"
+          onClick={() => setShowAuthModal(false)}
+        >
+          <div
+            className="relative w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900/90 p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <EnhancedAuthForm
               authMode={authMode}
               onSuccess={handleAuthSuccess}
