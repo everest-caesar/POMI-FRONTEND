@@ -181,8 +181,8 @@ export default function EnhancedAuthForm({
         code: verificationCode,
       })
 
-      authService.setToken(response.token)
-      onSuccess(response.user)
+      // Pass both token and user to onSuccess for proper state management
+      onSuccess({ token: response.token, user: response.user })
       onClose()
     } catch (err: any) {
       setError(err.message || 'Verification failed')
@@ -230,8 +230,8 @@ export default function EnhancedAuthForm({
         age: pendingRegistrationData.age,
       })
 
-      authService.setToken(response.token)
-      onSuccess(response.user)
+      // Pass both token and user to onSuccess for proper state management
+      onSuccess({ token: response.token, user: response.user })
       onClose()
     } catch (err: any) {
       setError(err.message || 'Verification failed')

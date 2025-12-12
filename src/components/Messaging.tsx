@@ -105,9 +105,8 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const activeConversationIdRef = useRef<string | null>(null);
-  // Create admin conversation entry from admin messages
-  const adminConversation: Conversation | null = useMemo(() => {
-    if (adminMessages.length === 0) return null;
+  // Create admin conversation entry - always show admin team even without messages
+  const adminConversation: Conversation = useMemo(() => {
     const sortedMessages = [...adminMessages].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
@@ -115,7 +114,7 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
     return {
       userId: 'admin-team',
       userName: 'Admin Team',
-      lastMessage: latestMessage?.content || 'Welcome to Pomi!',
+      lastMessage: latestMessage?.content || 'Contact support or send feedback',
       lastMessageTime: latestMessage?.createdAt || new Date().toISOString(),
       unreadCount: adminUnreadCount,
       hasListing: false,
@@ -127,8 +126,8 @@ export default function Messaging({ currentUserId, currentUserName }: MessagingP
   const filteredConversations = useMemo(() => {
     const query = conversationQuery.trim().toLowerCase();
 
-    // Start with admin conversation if it exists
-    let allConversations = adminConversation ? [adminConversation, ...conversations] : conversations;
+    // Always include admin conversation at the top
+    let allConversations = [adminConversation, ...conversations];
 
     if (!query) {
       return allConversations;
