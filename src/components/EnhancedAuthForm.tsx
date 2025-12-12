@@ -45,7 +45,13 @@ export default function EnhancedAuthForm({
   })
   const [verificationCode, setVerificationCode] = useState('')
   const [pendingEmail, setPendingEmail] = useState('')
-  const [step, setStep] = useState<'credentials' | 'verify'>('credentials')
+  const [pendingRegistrationData, setPendingRegistrationData] = useState<{
+    email: string;
+    password: string;
+    username: string;
+    age: number;
+  } | null>(null)
+  const [step, setStep] = useState<'credentials' | 'verify' | 'verify-signup'>('credentials')
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -117,16 +123,21 @@ export default function EnhancedAuthForm({
       }
 
       if (authMode === 'register') {
-        // Registration - direct login after success
-        const response = await authService.register({
+        // Registration - Step 1: Send verification code
+        await authService.sendVerificationCode({
+          email: formData.email,
+          type: 'signup',
+        })
+        // Store registration data for after verification
+        setPendingRegistrationData({
           email: formData.email,
           password: formData.password,
           username: formData.username,
           age: parsedAge as number,
         })
-        authService.setToken(response.token)
-        onSuccess(response.user)
-        onClose()
+        setPendingEmail(formData.email)
+        setStep('verify-signup')
+        setSuccessMessage('A verification code has been sent to your email')
       } else {
         // Login - Step 1: Password verification, sends 2FA code
         const response = await authService.login({
@@ -180,17 +191,74 @@ export default function EnhancedAuthForm({
     }
   }
 
+  const handleVerifySignup = async () => {
+    setError('')
+    setSuccessMessage('')
+    setLoading(true)
+
+    try {
+      if (!verificationCode || verificationCode.length !== 6) {
+        setError('Please enter the 6-digit verification code')
+        setLoading(false)
+        return
+      }
+
+      if (!pendingRegistrationData) {
+        setError('Registration data missing. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      // Verify the code first
+      const verifyResponse = await authService.verifyCode({
+        email: pendingEmail,
+        code: verificationCode,
+        type: 'signup',
+      })
+
+      if (!verifyResponse.verified) {
+        setError('Invalid verification code')
+        setLoading(false)
+        return
+      }
+
+      // Code verified - now complete registration
+      const response = await authService.register({
+        email: pendingRegistrationData.email,
+        password: pendingRegistrationData.password,
+        username: pendingRegistrationData.username,
+        age: pendingRegistrationData.age,
+      })
+
+      authService.setToken(response.token)
+      onSuccess(response.user)
+      onClose()
+    } catch (err: any) {
+      setError(err.message || 'Verification failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleResendCode = async () => {
     setError('')
     setSuccessMessage('')
     setLoading(true)
 
     try {
-      // Re-submit login to get a new code
-      await authService.login({
-        email: formData.email,
-        password: formData.password,
-      })
+      if (step === 'verify-signup') {
+        // Resend signup verification code
+        await authService.sendVerificationCode({
+          email: pendingEmail,
+          type: 'signup',
+        })
+      } else {
+        // Resend login verification code
+        await authService.login({
+          email: formData.email,
+          password: formData.password,
+        })
+      }
       setSuccessMessage('A new verification code has been sent to your email')
       setVerificationCode('')
     } catch (err: any) {
@@ -204,6 +272,7 @@ export default function EnhancedAuthForm({
     setStep('credentials')
     setVerificationCode('')
     setPendingEmail('')
+    setPendingRegistrationData(null)
     setError('')
     setSuccessMessage('')
   }
@@ -212,6 +281,7 @@ export default function EnhancedAuthForm({
     setFormData({ email: '', password: '', username: '', age: '25' })
     setVerificationCode('')
     setPendingEmail('')
+    setPendingRegistrationData(null)
     setStep('credentials')
     setError('')
     setSuccessMessage('')
@@ -303,6 +373,98 @@ export default function EnhancedAuthForm({
               className="text-slate-400 hover:text-slate-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
             >
               Back to login
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Signup Verification Step UI - Dark Theme
+  if (step === 'verify-signup') {
+    return (
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="mb-6">
+          <h3 className="text-2xl font-bold text-white">
+            Verify Your Email
+          </h3>
+          <p className="text-sm text-slate-400 mt-2">
+            Enter the 6-digit code sent to {pendingEmail}
+          </p>
+        </div>
+
+        {/* Success Message */}
+        {successMessage && (
+          <div className="rounded-lg border border-emerald-600/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            {successMessage}
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="rounded-lg border border-rose-600/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            {error}
+          </div>
+        )}
+
+        {/* Verification Code Input */}
+        <div className="space-y-3">
+          <div>
+            <label className="block text-slate-200 font-medium mb-2 text-sm">
+              Verification Code
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              placeholder="Enter 6-digit code"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white text-lg text-center tracking-[0.5em] font-mono placeholder:tracking-normal placeholder:text-sm placeholder:text-slate-500 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              autoFocus
+            />
+          </div>
+
+          <p className="text-xs text-slate-500">
+            The code will expire in 10 minutes. Check your spam folder if you don't see it.
+          </p>
+        </div>
+
+        {/* Verify Button */}
+        <button
+          onClick={handleVerifySignup}
+          disabled={loading || verificationCode.length !== 6}
+          className="w-full rounded-lg bg-orange-500 hover:bg-orange-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-3 transition-colors mt-4"
+        >
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+              Creating account...
+            </span>
+          ) : (
+            'Verify & Create Account'
+          )}
+        </button>
+
+        {/* Resend Code */}
+        <div className="text-center space-y-2 pt-2">
+          <button
+            onClick={handleResendCode}
+            disabled={loading}
+            className="text-orange-400 hover:text-orange-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+          >
+            Resend verification code
+          </button>
+
+          <div>
+            <button
+              onClick={handleBackToLogin}
+              disabled={loading}
+              className="text-slate-400 hover:text-slate-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+            >
+              Back to sign up
             </button>
           </div>
         </div>
@@ -444,9 +606,13 @@ export default function EnhancedAuthForm({
           )}
         </div>
 
-        {authMode === 'login' && (
+        {authMode === 'login' ? (
           <p className="text-xs text-slate-500">
             A verification code will be sent to your email for secure login.
+          </p>
+        ) : (
+          <p className="text-xs text-slate-500">
+            A verification code will be sent to your email to confirm your account.
           </p>
         )}
 
@@ -467,12 +633,12 @@ export default function EnhancedAuthForm({
             {loading ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
-                {authMode === 'login' ? 'Sending...' : 'Creating...'}
+                {authMode === 'login' ? 'Sending code...' : 'Sending code...'}
               </span>
             ) : authMode === 'login' ? (
-              'Sign in'
+              'Continue'
             ) : (
-              'Create account'
+              'Continue'
             )}
           </button>
         </div>

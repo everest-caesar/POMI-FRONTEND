@@ -45,6 +45,22 @@ interface VerifyLoginRequest {
   code: string;
 }
 
+interface SendVerificationRequest {
+  email: string;
+  type: 'signup' | 'login';
+}
+
+interface VerifyCodeRequest {
+  email: string;
+  code: string;
+  type: 'signup' | 'login';
+}
+
+interface VerifyCodeResponse {
+  message: string;
+  verified: boolean;
+}
+
 export interface User {
   _id: string;
   email: string;
@@ -113,6 +129,33 @@ class AuthService {
       const response = await this.api.post<AuthResponse>('/auth/verify-login', {
         email: data.email,
         code: data.code,
+      });
+      return response.data;
+    } catch (error: any) {
+      const message = error.response?.data?.error || 'Verification failed';
+      throw new Error(message);
+    }
+  }
+
+  async sendVerificationCode(data: SendVerificationRequest): Promise<{ message: string }> {
+    try {
+      const response = await this.api.post<{ message: string }>('/auth/send-verification', {
+        email: data.email,
+        type: data.type,
+      });
+      return response.data;
+    } catch (error: any) {
+      const message = error.response?.data?.error || 'Failed to send verification code';
+      throw new Error(message);
+    }
+  }
+
+  async verifyCode(data: VerifyCodeRequest): Promise<VerifyCodeResponse> {
+    try {
+      const response = await this.api.post<VerifyCodeResponse>('/auth/verify-code', {
+        email: data.email,
+        code: data.code,
+        type: data.type,
       });
       return response.data;
     } catch (error: any) {
