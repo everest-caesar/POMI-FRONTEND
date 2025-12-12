@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Search, Plus, Calendar, MapPin, Users, Clock, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Home, Search, Plus, Calendar, MapPin, Users, Clock, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -199,17 +199,26 @@ export default function EventsPage() {
               onClick={() => navigate(-1)}
             >
               <ArrowLeft className="h-4 w-4" />
-              Back
+              <span className="hidden sm:inline">Back</span>
             </Button>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-rose-600">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-slate-300 hover:text-white hover:bg-slate-800"
+              onClick={() => navigate('/')}
+            >
+              <Home className="h-4 w-4" />
+              <span className="hidden sm:inline">Home</span>
+            </Button>
+            <Link to="/" className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-rose-600 hover:scale-[1.02] transition">
                 <span className="text-lg font-bold text-white">P</span>
               </div>
               <div>
                 <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Pomi</p>
                 <p className="text-sm font-semibold text-white">Events</p>
               </div>
-            </div>
+            </Link>
           </div>
           <Link to="/events/new">
             <Button size="sm" className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
